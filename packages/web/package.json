@@ -1,0 +1,16 @@
+{
+  "name": "@unrush/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "chat": "tsx --env-file-if-exists=../../.env server/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.1152.0",
+    "@modelcontextprotocol/sdk": "^1.32.1"
+  }
+}
