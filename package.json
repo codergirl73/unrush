@@ -1,0 +1,33 @@
+{
+  "name": "unrush",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Unrush: a proactive household assistant (simulated Alexa+ experience) that watches your calendar, kitchen and groceries and speaks first. Built on MCP + Amazon Bedrock.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "workspaces": [
+    "packages/mcp-server"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @unrush/mcp-server",
+    "seed": "npm run seed -w @unrush/mcp-server",
+    "demo:trigger": "npm run demo:trigger -w @unrush/mcp-server",
+    "test": "npm test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true,
+    "esbuild@0.28.2": true,
+    "fsevents": false
+  }
+}
