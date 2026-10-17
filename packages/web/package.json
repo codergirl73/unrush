@@ -6,17 +6,25 @@
   "license": "MIT",
   "scripts": {
     "dev:server": "tsx watch --env-file-if-exists=../../.env server/index.ts",
+    "dev:ui": "vite",
+    "build": "vite build",
     "start": "tsx --env-file-if-exists=../../.env server/index.ts",
     "chat": "tsx --env-file-if-exists=../../.env server/cli.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p ."
+    "typecheck": "tsc -p . && tsc -p src"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-runtime": "^3.1152.0",
     "@modelcontextprotocol/sdk": "^1.32.1",
-    "express": "^5.3.0"
+    "express": "^5.3.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   },
   "devDependencies": {
-    "@types/express": "^5.0.6"
+    "@types/express": "^5.0.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.4"
   }
 }

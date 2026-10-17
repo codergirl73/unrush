@@ -13,13 +13,14 @@
     "packages/web"
   ],
   "scripts": {
-    "dev": "concurrently -k -n mcp,api -c magenta,cyan \"npm run dev -w @unrush/mcp-server\" \"npm run dev:server -w @unrush/web\"",
+    "dev": "concurrently -k -n mcp,api,ui -c magenta,cyan,green \"npm run dev -w @unrush/mcp-server\" \"npm run dev:server -w @unrush/web\" \"npm run dev:ui -w @unrush/web\"",
     "dev:offline": "UNRUSH_OFFLINE=1 npm run dev",
     "seed": "npm run seed -w @unrush/mcp-server",
     "demo:trigger": "npm run demo:trigger -w @unrush/mcp-server",
     "chat": "npm run chat -w @unrush/web",
     "test": "npm test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "build": "npm run build -w @unrush/web"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

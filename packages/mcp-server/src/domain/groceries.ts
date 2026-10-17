@@ -120,7 +120,8 @@ export class Groceries {
     const h = (q: number) => humanize(q, unit);
     const fmt = (q: number) => {
       const x = h(q);
-      return x.unit === "count" ? `${x.quantity}` : `${x.quantity} ${x.unit}`;
+      const n = x.quantity >= 10 ? Math.round(x.quantity) : Math.round(x.quantity * 10) / 10;
+      return x.unit === "count" ? `${n}` : `${n} ${x.unit}`;
     };
     const when = daysLeft < 1 ? "today" : daysLeft < 2 ? "tomorrow" : `${weekdayOf(runout)} (${runout})`;
     const history = `Bought ${buys.length}× in the last ${Math.round(spanDays / 7)} weeks, about every ${Math.round(meanInterval)} days (usually ${fmt(typical)}). Uses ~${fmt(round(rate))}/day.`;
