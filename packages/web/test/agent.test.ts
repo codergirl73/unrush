@@ -74,9 +74,9 @@ const toolUse = (toolUseId: string, name: string, input: Record<string, unknown>
 const toolResults = (m: Message) => m.content!.map((b) => b.toolResult!);
 
 describe("MCP → Bedrock tool conversion", () => {
-  it("negotiates MCP 2025-11-25 and exposes all 15 tools", () => {
+  it("negotiates MCP 2025-11-25 and exposes all 16 tools", () => {
     expect(bridge.protocolVersion).toBe("2025-11-25");
-    expect(bridge.toolConfig().tools).toHaveLength(15);
+    expect(bridge.toolConfig().tools).toHaveLength(16);
   });
 
   it("hides household_id from the model and drops $schema", () => {
@@ -206,6 +206,7 @@ describe("conversation memory", () => {
     m.broadcast({ user: "[proactive]", assistant: "Leave by 7:05?" });
     expect(m.lastAssistant("a")).toBe("Leave by 7:05?");
     expect(m.lastAssistant("b")).toBe("Leave by 7:05?");
+    expect(m.get("new-tab")).toEqual([{ user: "[proactive]", assistant: "Leave by 7:05?" }]);
   });
 });
 

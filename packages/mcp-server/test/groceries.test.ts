@@ -103,3 +103,13 @@ describe("place_order", () => {
     expect(() => app.groceries.placeOrder(H, "ord_nope", true)).toThrow(/build_grocery_order/);
   });
 });
+
+describe("get_order", () => {
+  it("returns the latest order (or null) with its read-back", () => {
+    const { app } = seeded();
+    expect(app.groceries.findOrder(H).order).toBeNull();
+    const o = app.groceries.buildOrder(H);
+    expect(app.groceries.findOrder(H).order).toMatchObject({ order_id: o.order_id, status: "draft", read_back: o.read_back });
+    expect(() => app.groceries.findOrder(H, "ord_nope")).toThrow(/build_grocery_order/);
+  });
+});

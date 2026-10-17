@@ -1,5 +1,5 @@
 /**
- * Builds the Unrush McpServer: 15 tools and 2 resources. A fresh McpServer is created
+ * Builds the Unrush McpServer: 16 tools and 2 resources. A fresh McpServer is created
  * per MCP session (see index.ts); all of them share one Unrush instance and SQLite
  * DB, so state belongs to the household, not to the session.
  */
@@ -483,6 +483,35 @@ export function createUnrushServer(app: Unrush): McpServer {
       annotations: { destructiveHint: false, idempotentHint: false },
     },
     (args, extra) => run("place_order", args, extra, () => app.groceries.placeOrder(args.household_id, args.order_id, args.confirmed)),
+  );
+
+  server.registerTool(
+    "get_order",
+    {
+      title: "Get grocery order",
+      description:
+        "Get a grocery order by order_id, or the most recent one when order_id is omitted: status (draft or placed), items by " +
+        "section, read_back text and the simulated confirmation number once placed.",
+      inputSchema: { household_id: householdId, order_id: z.string().optional().describe("Omit for the most recent order") },
+      outputSchema: {
+        household_id: z.string(),
+        order: z
+          .object({
+            order_id: z.string(),
+            status: z.enum(["draft", "placed"]),
+            simulated: z.boolean(),
+            confirmation_number: z.string().nullable(),
+            created_at: z.string(),
+            placed_at: z.string().nullable(),
+            item_count: z.number(),
+            sections: orderSections,
+            read_back: z.string(),
+          })
+          .nullable(),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    (args, extra) => run("get_order", args, extra, () => app.groceries.findOrder(args.household_id, args.order_id)),
   );
 
   // ----- proactive -----

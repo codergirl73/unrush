@@ -16,13 +16,13 @@ At each session init the server logs the negotiated protocol version, and it war
 ✓ session initialized {"client":"…","requestedProtocol":"2025-11-25","negotiatedProtocol":"2025-11-25","target":"2025-11-25"}
 ```
 
-## Tools (15)
+## Tools (16)
 
 | Area | Tools |
 |---|---|
 | Calendar | `get_schedule`, `add_or_update_event`, `compute_leave_by` |
 | Pantry & meals | `get_pantry`, `update_pantry`, `get_preferences`, `set_preferences`, `get_meal_plan`, `save_meal_plan`, `suggest_quick_meal`, `mark_meal_cooked` |
-| Groceries | `predict_runouts`, `build_grocery_order`, `place_order` (refuses unless `confirmed: true`; checkout is simulated) |
+| Groceries | `predict_runouts`, `build_grocery_order`, `place_order` (refuses unless `confirmed: true`; checkout is simulated), `get_order` |
 | Proactive | `get_alerts` |
 
 Every tool has a zod input schema and a structured output schema, and each call is logged with its duration.

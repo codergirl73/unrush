@@ -1,8 +1,14 @@
-/** Short-term conversation memory: the last N turns per browser session. Long-term state lives in the MCP server. */
+/**
+ * Short-term conversation memory: the last N turns per browser session. Long-term
+ * state lives in the MCP server. Proactive turns (Unrush speaking first) are
+ * appended to every session and kept as a shared starting point, so a session
+ * whose first words are "yes" still knows what it is agreeing to.
+ */
 import type { Turn } from "./agent.js";
 
 export class ConversationMemory {
   private sessions = new Map<string, { turns: Turn[]; seen: number }>();
+  private shared: Turn[] = [];
 
   constructor(
     private readonly maxTurns: number,
@@ -12,15 +18,15 @@ export class ConversationMemory {
   get(sessionId: string): Turn[] {
     const s = this.sessions.get(sessionId);
     if (s) s.seen = Date.now();
-    return s ? [...s.turns] : [];
+    return s ? [...s.turns] : [...this.shared];
   }
 
   lastAssistant(sessionId: string): string | undefined {
-    return this.sessions.get(sessionId)?.turns.at(-1)?.assistant;
+    return this.get(sessionId).at(-1)?.assistant;
   }
 
   add(sessionId: string, turn: Turn) {
-    const s = this.sessions.get(sessionId) ?? { turns: [], seen: 0 };
+    const s = this.sessions.get(sessionId) ?? { turns: [...this.shared], seen: 0 };
     s.turns = [...s.turns, turn].slice(-this.maxTurns);
     s.seen = Date.now();
     this.sessions.set(sessionId, s);
@@ -30,13 +36,17 @@ export class ConversationMemory {
     }
   }
 
-  /** Append to every session (used when Unrush speaks first, so later "yes" has context). */
+  /** Unrush spoke first: every session (and any new one) should know. */
   broadcast(turn: Turn) {
+    this.shared = [...this.shared, turn].slice(-this.maxTurns);
     for (const id of this.sessions.keys()) this.add(id, turn);
   }
 
   clear(sessionId?: string) {
     if (sessionId) this.sessions.delete(sessionId);
-    else this.sessions.clear();
+    else {
+      this.sessions.clear();
+      this.shared = [];
+    }
   }
 }

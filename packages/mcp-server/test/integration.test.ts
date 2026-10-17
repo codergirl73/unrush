@@ -64,6 +64,7 @@ describe("MCP over Streamable HTTP", () => {
       "compute_leave_by",
       "get_alerts",
       "get_meal_plan",
+      "get_order",
       "get_pantry",
       "get_preferences",
       "get_schedule",
@@ -137,6 +138,8 @@ describe("MCP over Streamable HTTP", () => {
     const placed = await data("place_order", { order_id: order.order_id, confirmed: true });
     expect(placed).toMatchObject({ status: "placed", simulated: true });
     expect(placed.confirmation_number).toMatch(/^SIM-/);
+    const latest = await data("get_order");
+    expect(latest.order).toMatchObject({ order_id: order.order_id, status: "placed", confirmation_number: placed.confirmation_number });
     await client.close();
   });
 

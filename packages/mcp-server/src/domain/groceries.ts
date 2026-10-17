@@ -235,11 +235,15 @@ export class Groceries {
     return row;
   }
 
-  latestOrder(householdId: string) {
-    const row = this.ctx.db
-      .prepare("SELECT * FROM orders WHERE household_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
-      .get(householdId) as OrderRow | undefined;
-    return row ? orderView(row) : null;
+  /** One order by id, or the most recent one when no id is given (null if there are none). */
+  findOrder(householdId: string, orderId?: string) {
+    validateHousehold(householdId);
+    const row = orderId
+      ? this.getOrder(householdId, orderId)
+      : (this.ctx.db
+          .prepare("SELECT * FROM orders WHERE household_id = ? ORDER BY created_at DESC, rowid DESC LIMIT 1")
+          .get(householdId) as OrderRow | undefined);
+    return { household_id: householdId, order: row ? orderView(row) : null };
   }
 
   /** SIMULATED checkout. Refuses unless confirmed === true. Never touches payment data. */
@@ -301,6 +305,7 @@ function orderView(row: OrderRow) {
     placed_at: row.placed_at,
     item_count: data.items.length,
     sections: groupBySection(data.items),
+    read_back: readBack(data.items),
   };
 }
 

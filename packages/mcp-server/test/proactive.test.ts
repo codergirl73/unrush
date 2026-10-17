@@ -23,7 +23,7 @@ describe("proactive engine", () => {
     expect(alerts[1]!.message).toBe(
       "Tonight's Chicken curry with rice takes 45 minutes, but your longest free stretch before 9:30pm is 40 minutes (from 8:50pm).",
     );
-    expect(alerts[1]!.data).toMatchObject({ prep_minutes: 45, longest_free_minutes: 40, suggested_max_minutes: 20 });
+    expect(alerts[1]!.data).toMatchObject({ prep_minutes: 45, longest_free_minutes: 40, suggested_max_minutes: 15 });
   });
 
   it("does not repeat itself, and mark_delivered hands each alert out once", () => {
@@ -61,5 +61,19 @@ describe("proactive engine", () => {
     clock.set(`${TODAY}T18:10`);
     const { alerts } = app.proactive.getAlerts(H);
     expect(alerts.find((a) => a.kind === "leave_by")!.message).toBe("To reach your 7:30pm Study group you'll need to leave by 7:05pm.");
+  });
+});
+
+describe("proactive engine: repeated changes", () => {
+  it("raises a fresh leave-by alert when the meeting moves again, and says when it overlaps", () => {
+    const { app } = seeded();
+    lateMeeting(app, "19:00");
+    app.proactive.getAlerts(H, { markDelivered: true });
+    lateMeeting(app, "19:15");
+    const { alerts } = app.proactive.getAlerts(H);
+    expect(alerts.map((a) => a.kind)).toEqual(["leave_by"]);
+    expect(alerts[0]!.message).toBe(
+      "Your 5:30pm Project sync now runs to 7:15pm. To reach your 7:30pm Study group you'll need to leave by 7:05pm. That's 10 minutes before Project sync ends.",
+    );
   });
 });

@@ -167,9 +167,11 @@ export class ProactiveEngine {
         : "";
       out.push({
         kind: "leave_by",
-        key: `leave_by:${e.id}:${lb.leave_by}`,
+        key: `leave_by:${e.id}:${lb.leave_by}:${prior?.end ?? ""}`,
         title: `Leave by ${lb.leave_by_spoken}`,
-        message: `${lead}To reach your ${spokenTime(e.start)} ${e.title} you'll need to leave by ${lb.leave_by_spoken}.`,
+        message:
+          `${lead}To reach your ${spokenTime(e.start)} ${e.title} you'll need to leave by ${lb.leave_by_spoken}.` +
+          (lb.conflict && prior ? ` That's ${-lb.minutes_free_before_leaving!} minutes before ${prior.title} ends.` : ""),
         data: {
           event_id: e.id,
           event_title: e.title,
@@ -213,7 +215,7 @@ export class ProactiveEngine {
           prep_minutes: day.prep_minutes,
           longest_free_minutes: longest,
           windows,
-          suggested_max_minutes: Math.max(10, Math.min(longest, 20)),
+          suggested_max_minutes: longest >= 15 ? 15 : Math.max(10, longest),
         },
       },
     ];
