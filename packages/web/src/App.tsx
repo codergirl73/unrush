@@ -3,7 +3,9 @@ import { clock, fetchState, newSessionId, resetSession, streamChat } from "./api
 import { ActivityPanel, type ActivityItem, type ActivityTurn } from "./components/ActivityPanel";
 import { AlertBanner, DinnerCard, OrderCard, PantryCard, RunoutCard, TimelineCard } from "./components/Cards";
 import { Logo, MoonIcon, SunIcon } from "./components/icons";
+import { McpAppFrame } from "./components/McpAppFrame";
 import { VoicePanel, type ChatMessage } from "./components/VoicePanel";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { useSpeaker } from "./speech";
 import type { AgentEvent, Alert, AppState, ServerEvent, Status } from "./types";
 
@@ -66,6 +68,8 @@ export function App() {
   const [flash, setFlash] = useState<Record<string, number>>({});
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [sessionId, setSessionId] = useState(newSessionId);
+  const [view, setView] = useState<"cards" | "apps">("cards");
+  const [appResults, setAppResults] = useState<{ schedule: CallToolResult | null; order: CallToolResult | null }>({ schedule: null, order: null });
   const speaker = useSpeaker();
   const speakRef = useRef(speaker.speak);
   speakRef.current = speaker.speak;
@@ -175,6 +179,15 @@ export function App() {
     void refresh();
   }, [sessionId, refresh]);
 
+  // MCP Apps mode: fetch the linked tools' results whenever the household state changes.
+  const stateKey = state ? JSON.stringify([state.schedule.events, state.order, state.tonight]) : "";
+  useEffect(() => {
+    if (view !== "apps" || !stateKey) return;
+    const call = (name: string) =>
+      fetch("/api/apps/call", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name, arguments: {} }) }).then((r) => r.json() as Promise<CallToolResult>);
+    void Promise.all([call("get_schedule"), call("get_order")]).then(([schedule, order]) => setAppResults({ schedule, order }));
+  }, [view, stateKey]);
+
   const offline = status?.offline ?? false;
 
   return (
@@ -193,6 +206,10 @@ export function App() {
             <i className={status?.protocolVersion ? "on" : "off"} /> MCP {status?.protocolVersion ?? "—"} · Streamable HTTP · {status?.tools ?? 0} tools
           </span>
           <span className={`chip-status ${offline ? "warn" : ""}`}>{offline ? "Offline rehearsal (not Bedrock)" : `Amazon Bedrock · ${status?.model ?? "…"}`}</span>
+          <div className="view-toggle" role="group" aria-label="Card view">
+            <button className={view === "cards" ? "on" : ""} onClick={() => setView("cards")}>Cards</button>
+            <button className={view === "apps" ? "on" : ""} onClick={() => setView("apps")} title="The same cards, served by the MCP server as MCP Apps (ui:// resources)">MCP Apps</button>
+          </div>
           <button className="icon-btn" onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} aria-label="Toggle light/dark mode">
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>
@@ -214,7 +231,12 @@ export function App() {
           onNewSession={newSession}
         />
         <div className="cards">
-          {state ? (
+          {state && view === "apps" ? (
+            <>
+              <McpAppFrame uri="ui://unrush/evening.html" toolName="get_schedule" result={appResults.schedule} theme={theme} onMessage={send} />
+              <McpAppFrame uri="ui://unrush/order.html" toolName="get_order" result={appResults.order} theme={theme} onMessage={send} />
+            </>
+          ) : state ? (
             <>
               <TimelineCard state={state} flash={!!flash.timeline} key={`t${flash.timeline ?? 0}`} />
               <div className="card-row">

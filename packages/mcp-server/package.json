@@ -14,6 +14,7 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@modelcontextprotocol/ext-apps": "^1.7.5",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "better-sqlite3": "^13.0.3",
     "express": "^5.3.0",

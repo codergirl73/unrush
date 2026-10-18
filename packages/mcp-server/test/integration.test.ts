@@ -87,11 +87,36 @@ describe("MCP over Streamable HTTP", () => {
 
     const { resources } = await client.listResources();
     expect(resources.map((r) => r.uri).sort()).toEqual([
+      "ui://unrush/evening.html",
+      "ui://unrush/order.html",
       `unrush://households/${H}/pantry`,
       `unrush://households/${H}/schedule/today`,
     ]);
     const sched = await client.readResource({ uri: `unrush://households/${H}/schedule/today` });
     expect(JSON.parse((sched.contents[0] as { text: string }).text)).toMatchObject({ date: TODAY, simulated: true });
+    await client.close();
+  });
+
+  it("serves MCP Apps: tools link to ui:// views that embed the official App runtime", async () => {
+    const { client } = await connect(server.url);
+    const { tools } = await client.listTools();
+    const ui = (n: string) => (tools.find((t) => t.name === n)!._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri;
+    expect(ui("get_schedule")).toBe("ui://unrush/evening.html");
+    expect(ui("build_grocery_order")).toBe("ui://unrush/order.html");
+    expect(ui("get_order")).toBe("ui://unrush/order.html");
+    expect(ui("place_order")).toBe("ui://unrush/order.html");
+    expect(ui("get_pantry")).toBeUndefined();
+    for (const uri of ["ui://unrush/evening.html", "ui://unrush/order.html"]) {
+      const r = await client.readResource({ uri });
+      const c = r.contents[0] as { mimeType: string; text: string };
+      expect(c.mimeType).toBe("text/html;profile=mcp-app");
+      expect(c.text).toMatch(/^<!doctype html>/);
+      expect(c.text).toContain("globalThis.McpApps=");
+      expect(c.text).toContain("await app.connect()");
+      expect(c.text).not.toMatch(/place_order/); // views never order directly
+    }
+    const order = (await client.readResource({ uri: "ui://unrush/order.html" })).contents[0] as { text: string };
+    expect(order.text).toContain("Yes, place the order.");
     await client.close();
   });
 

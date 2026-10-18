@@ -191,6 +191,37 @@ export function createApp({ config, bridge, model, skills = loadSkills(), log = 
     }
   });
 
+  // ---------- MCP Apps host support ----------
+
+  app.get("/api/apps", (_req, res) => res.json({ views: bridge.appViews() }));
+
+  app.get("/api/apps/resource", async (req, res) => {
+    const uri = String(req.query.uri ?? "");
+    if (!bridge.appViews().some((v) => v.resourceUri === uri)) {
+      res.status(404).json({ error: `Unknown MCP Apps view ${uri}` });
+      return;
+    }
+    try {
+      res.json({ uri, html: await bridge.readResource(uri) });
+    } catch (err) {
+      res.status(502).json({ error: (err as Error).message });
+    }
+  });
+
+  /** Tool calls from inside a view. Read-only tools only: views can show things, never change them. */
+  app.post("/api/apps/call", async (req, res) => {
+    const { name, arguments: args } = (req.body ?? {}) as { name?: string; arguments?: Record<string, unknown> };
+    if (typeof name !== "string" || !bridge.isReadOnly(name)) {
+      res.status(403).json({ content: [{ type: "text", text: `Views may only call read-only tools; "${name}" is not one.` }], isError: true });
+      return;
+    }
+    try {
+      res.json(await bridge.callToolRaw(name, args ?? {}));
+    } catch (err) {
+      res.status(502).json({ content: [{ type: "text", text: (err as Error).message }], isError: true });
+    }
+  });
+
   app.post("/api/reset-session", (req, res) => {
     memory.clear(String((req.body ?? {}).sessionId ?? ""));
     res.json({ ok: true });

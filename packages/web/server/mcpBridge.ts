@@ -58,6 +58,32 @@ export class McpBridge {
     return out.data;
   }
 
+  /** Raw MCP calls for the MCP Apps host (household_id injected like any other call). */
+  async callToolRaw(name: string, input: Record<string, unknown> = {}): Promise<CallToolResult> {
+    const args = this.takesHousehold(name) ? { ...input, household_id: this.householdId } : input;
+    return this.rawCall(name, args);
+  }
+
+  async readResource(uri: string): Promise<string> {
+    if (!this.client) await this.connect();
+    const r = await this.client!.readResource({ uri });
+    const c = r.contents[0] as { text?: string } | undefined;
+    if (!c?.text) throw new Error(`Resource ${uri} has no text content`);
+    return c.text;
+  }
+
+  /** Tools that declare an MCP Apps view (_meta.ui.resourceUri). */
+  appViews(): Array<{ tool: string; resourceUri: string; readOnly: boolean }> {
+    return this.tools.flatMap((t) => {
+      const uri = (t._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri;
+      return uri ? [{ tool: t.name, resourceUri: uri, readOnly: !!t.annotations?.readOnlyHint }] : [];
+    });
+  }
+
+  isReadOnly(name: string): boolean {
+    return !!this.tools.find((t) => t.name === name)?.annotations?.readOnlyHint;
+  }
+
   /** Current local time on the Unrush clock ("YYYY-MM-DDTHH:MM"). */
   async now(): Promise<string> {
     return String((await this.read("get_schedule")).now);

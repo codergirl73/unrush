@@ -1,9 +1,11 @@
 /**
- * Builds the Unrush McpServer: 16 tools and 2 resources. A fresh McpServer is created
+ * Builds the Unrush McpServer: 16 tools, 2 data resources and 2 MCP Apps UI resources. A fresh McpServer is created
  * per MCP session (see index.ts); all of them share one Unrush instance and SQLite
  * DB, so state belongs to the household, not to the session.
  */
 import { McpServer, ResourceTemplate } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { RESOURCE_MIME_TYPE, registerAppResource, registerAppTool } from "@modelcontextprotocol/ext-apps/server";
+import { EVENING_VIEW_URI, ORDER_VIEW_URI, eveningViewHtml, orderViewHtml } from "./apps/views.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { WEEKDAYS } from "./dates.js";
@@ -149,9 +151,11 @@ export function createUnrushServer(app: Unrush): McpServer {
 
   // ----- calendar -----
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "get_schedule",
     {
+      _meta: { ui: { resourceUri: EVENING_VIEW_URI } },
       title: "Get schedule",
       description:
         "List the household's calendar events for a date (default today), with a leave_by time for events that need travel. " +
@@ -429,9 +433,11 @@ export function createUnrushServer(app: Unrush): McpServer {
     (args, extra) => run("predict_runouts", args, extra, () => app.groceries.predictRunouts(args.household_id, args.days_ahead)),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "build_grocery_order",
     {
+      _meta: { ui: { resourceUri: ORDER_VIEW_URI } },
       title: "Build grocery order",
       description:
         "Build a DRAFT grocery order: ingredients missing for upcoming planned dinners, staples predicted to run out, and items " +
@@ -455,9 +461,11 @@ export function createUnrushServer(app: Unrush): McpServer {
     (args, extra) => run("build_grocery_order", args, extra, () => app.groceries.buildOrder(args.household_id, args.days_ahead)),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "place_order",
     {
+      _meta: { ui: { resourceUri: ORDER_VIEW_URI } },
       title: "Place order (simulated)",
       description:
         "Place a draft grocery order through the SIMULATED store. confirmed MUST be true and may only be true after the user " +
@@ -485,9 +493,11 @@ export function createUnrushServer(app: Unrush): McpServer {
     (args, extra) => run("place_order", args, extra, () => app.groceries.placeOrder(args.household_id, args.order_id, args.confirmed)),
   );
 
-  server.registerTool(
+  registerAppTool(
+    server,
     "get_order",
     {
+      _meta: { ui: { resourceUri: ORDER_VIEW_URI } },
       title: "Get grocery order",
       description:
         "Get a grocery order by order_id, or the most recent one when order_id is omitted: status (draft or placed), items by " +
@@ -575,6 +585,16 @@ export function createUnrushServer(app: Unrush): McpServer {
       return { contents: [{ uri: uri.href, mimeType: "application/json", text: JSON.stringify(app.schedule.get(String(variables.household_id)), null, 2) }] };
     },
   );
+
+  // ----- MCP Apps: interactive UI for MCP Apps-capable hosts -----
+
+  const view = (name: string, uri: string, title: string, description: string, html: () => string) =>
+    registerAppResource(server, name, uri, { title, description, mimeType: RESOURCE_MIME_TYPE }, async () => {
+      log("resource read", { uri });
+      return { contents: [{ uri, mimeType: RESOURCE_MIME_TYPE, text: html() }] };
+    });
+  view("evening-view", EVENING_VIEW_URI, "Unrush evening", "Tonight's timeline, leave-by time and dinner (linked to get_schedule).", eveningViewHtml);
+  view("order-view", ORDER_VIEW_URI, "Unrush grocery order", "Grocery order card with a consent-first simulated checkout (linked to build_grocery_order, get_order, place_order).", orderViewHtml);
 
   return server;
 }
