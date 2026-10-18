@@ -17,16 +17,21 @@ import { ConversationMemory } from "./memory.js";
 import { offlineModel } from "./offlineModel.js";
 import { fallbackSpeech, proactiveInstruction, type AlertLike, type ServerEvent } from "./proactive.js";
 import { systemPrompt } from "./prompt.js";
+import { EVENING_RESCUE, activeSkillBlock, loadSkills, skillsCatalog, withSkills, type Skill } from "./skills.js";
 
 export interface AppOptions {
   config: Config;
   bridge: McpBridge;
   /** Override the model client (tests). */
   model?: ConverseClient;
+  /** Agent Skills to load (default: the repo's skills/ folder). */
+  skills?: Skill[];
   log?: (msg: string) => void;
 }
 
-export function createApp({ config, bridge, model, log = console.log }: AppOptions) {
+export function createApp({ config, bridge, model, skills = loadSkills(), log = console.log }: AppOptions) {
+  const tools = withSkills(bridge, skills);
+  const rescue = skills.find((s) => s.name === EVENING_RESCUE);
   let today = "";
   const client: ConverseClient = model ?? (config.offline ? offlineModel(() => today) : createBedrockClient(config));
   const modelId = config.offline ? "offline-rehearsal (not Bedrock)" : config.modelId;
@@ -36,6 +41,7 @@ export function createApp({ config, bridge, model, log = console.log }: AppOptio
   let active = 0;
 
   const status = () => ({
+    skills: skills.map((s) => s.name),
     mcpUrl: config.mcpUrl,
     protocolVersion: bridge.protocolVersion ?? null,
     tools: bridge.listMcpTools().length,
@@ -51,10 +57,11 @@ export function createApp({ config, bridge, model, log = console.log }: AppOptio
     for (const res of subscribers) res.write(line);
   };
 
-  async function systemNow() {
+  /** System prompt with the skills catalog; proactive turns also activate the evening-rescue skill. */
+  async function systemNow(proactive = false) {
     const now = await bridge.now();
     today = now.slice(0, 10);
-    return systemPrompt(now);
+    return systemPrompt(now, [skillsCatalog(skills), proactive && rescue ? activeSkillBlock(rescue) : ""]);
   }
 
   // ---------- proactive ----------
@@ -77,8 +84,8 @@ export function createApp({ config, bridge, model, log = console.log }: AppOptio
         const r = await runAgent({
           client,
           modelId,
-          bridge,
-          system: await systemNow(),
+          bridge: tools,
+          system: await systemNow(true),
           history: [],
           userText: instruction,
           maxTokens: config.maxTokens,
@@ -141,7 +148,7 @@ export function createApp({ config, bridge, model, log = console.log }: AppOptio
       const r = await runAgent({
         client,
         modelId,
-        bridge,
+        bridge: tools,
         system: await systemNow(),
         history: memory.get(sessionId),
         userText,

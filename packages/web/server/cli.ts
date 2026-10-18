@@ -12,6 +12,7 @@ import { allowsOrder } from "./consent.js";
 import { McpBridge } from "./mcpBridge.js";
 import { explainBedrockError, runAgent, type Turn } from "./agent.js";
 import { systemPrompt } from "./prompt.js";
+import { loadSkills, skillsCatalog, withSkills } from "./skills.js";
 
 const c = loadConfig();
 const problems = configProblems(c);
@@ -28,7 +29,9 @@ const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 const bridge = new McpBridge(c.mcpUrl, c.householdId, (m) => console.log(dim(m)));
 await bridge.connect();
 const bedrock = createBedrockClient(c);
-console.log(dim(`[bedrock] model=${c.modelId} region=${c.region} household=${c.householdId}`));
+const skills = loadSkills();
+const tools = withSkills(bridge, skills);
+console.log(dim(`[bedrock] model=${c.modelId} region=${c.region} household=${c.householdId} skills=${skills.map((s) => s.name).join(",") || "none"}`));
 console.log(`Unrush ready. Try "What's my evening look like?". Type "exit" to quit.\n`);
 
 const history: Turn[] = [];
@@ -43,8 +46,8 @@ while (true) {
     const { reply } = await runAgent({
       client: bedrock,
       modelId: c.modelId,
-      bridge,
-      system: systemPrompt(await bridge.now()),
+      bridge: tools,
+      system: systemPrompt(await bridge.now(), [skillsCatalog(skills)]),
       history: history.slice(-c.historyTurns),
       userText,
       maxTokens: c.maxTokens,

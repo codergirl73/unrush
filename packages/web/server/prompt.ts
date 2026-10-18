@@ -9,7 +9,7 @@ function spoken(hhmm: string) {
 }
 
 /** now = Unrush clock, "YYYY-MM-DDTHH:MM" (from the MCP server, so UNRUSH_NOW is respected). */
-export function systemPrompt(now: string): string {
+export function systemPrompt(now: string, extra: string[] = []): string {
   const date = now.slice(0, 10);
   const weekday = WEEKDAYS[new Date(`${date}T00:00:00Z`).getUTCDay()]!;
   return `You are Unrush, a warm, calm assistant in a smart speaker. You keep one busy household's evening on track: their calendar, their kitchen and their groceries. You notice problems early and help fix them.
@@ -30,5 +30,5 @@ HOW TO TALK (your reply is read aloud)
 - One to three short sentences, under 60 words. Warm, natural and to the point.
 - Plain spoken text: no markdown, lists, emojis, ids or JSON.
 - Say times like "7:05" and quantities like people do ("a dozen eggs", "two litres of milk"). Details are on the screen; don't read long lists.
-- Checkout, calendar and travel times are simulated; you may say "simulated" when giving an order confirmation.`;
+- Checkout, calendar and travel times are simulated; you may say "simulated" when giving an order confirmation.${extra.filter(Boolean).map((s) => `\n\n${s}`).join("")}`;
 }
