@@ -21,6 +21,15 @@ export class ConversationMemory {
     return s ? [...s.turns] : [...this.shared];
   }
 
+  has(sessionId: string): boolean {
+    return this.sessions.has(sessionId);
+  }
+
+  /** Start a session from turns loaded elsewhere (AgentCore Memory). */
+  seed(sessionId: string, turns: Turn[]) {
+    this.sessions.set(sessionId, { turns: turns.slice(-this.maxTurns), seen: Date.now() });
+  }
+
   lastAssistant(sessionId: string): string | undefined {
     return this.get(sessionId).at(-1)?.assistant;
   }

@@ -28,7 +28,9 @@ export type AgentEvent =
   | { type: "tool_call"; id: string; name: string; input: Record<string, unknown> }
   | { type: "tool_result"; id: string; name: string; ok: boolean; ms: number; data: Record<string, unknown> }
   | { type: "reply"; text: string }
-  | { type: "usage"; inputTokens: number; outputTokens: number; modelCalls: number; toolCalls: number; ms: number };
+  | { type: "usage"; inputTokens: number; outputTokens: number; modelCalls: number; toolCalls: number; ms: number }
+  /** Conversation memory activity (AgentCore Memory load/recall/save), emitted by the web backend, not the loop. */
+  | { type: "memory"; action: "load" | "recall" | "save"; ok: boolean; detail: string };
 
 /** Only the piece of BedrockRuntimeClient we use — lets tests pass a fake. */
 export type ConverseClient = Pick<BedrockRuntimeClient, "send">;

@@ -7,6 +7,7 @@ export type AgentEvent =
   | { type: "tool_result"; id: string; name: string; ok: boolean; ms: number; data: Record<string, unknown> }
   | { type: "reply"; text: string }
   | { type: "usage"; inputTokens: number; outputTokens: number; modelCalls: number; toolCalls: number; ms: number }
+  | { type: "memory"; action: "load" | "recall" | "save"; ok: boolean; detail: string }
   | { type: "error"; message: string }
   | { type: "done" };
 
@@ -36,6 +37,8 @@ export interface Status {
   region: string;
   offline: boolean;
   problems: string[];
+  memory?: string;
+  skills?: string[];
 }
 
 export interface CalendarEvent {

@@ -11,9 +11,12 @@
     "start": "tsx --env-file-if-exists=../../.env server/index.ts",
     "chat": "tsx --env-file-if-exists=../../.env server/cli.ts",
     "test": "vitest run",
-    "typecheck": "tsc -p . && tsc -p src"
+    "typecheck": "tsc -p . && tsc -p src",
+    "agentcore:setup": "tsx --env-file-if-exists=../../.env server/agentcore-setup.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-bedrock-agentcore": "^3.1152.0",
+    "@aws-sdk/client-bedrock-agentcore-control": "^3.1152.0",
     "@aws-sdk/client-bedrock-runtime": "^3.1152.0",
     "@modelcontextprotocol/ext-apps": "^1.7.5",
     "@modelcontextprotocol/sdk": "^1.32.1",

@@ -11,6 +11,8 @@ export interface Config {
   historyTurns: number;
   /** How often the backend polls get_alerts (ms). */
   alertPollMs: number;
+  /** AGENTCORE_MEMORY_ID: conversation memory in Amazon Bedrock AgentCore Memory (optional). */
+  agentcoreMemoryId: string;
   /** UNRUSH_OFFLINE=1: scripted rehearsal model instead of Bedrock (clearly labelled in the UI). */
   offline: boolean;
 }
@@ -25,6 +27,7 @@ export function loadConfig(env = process.env): Config {
     maxTokens: Number(env.BEDROCK_MAX_TOKENS ?? 1024),
     historyTurns: Number(env.HISTORY_TURNS ?? 8),
     alertPollMs: Number(env.ALERT_POLL_MS ?? 3000),
+    agentcoreMemoryId: env.AGENTCORE_MEMORY_ID?.trim() ?? "",
     offline: env.UNRUSH_OFFLINE === "1",
   };
 }

@@ -20,7 +20,8 @@
     "chat": "npm run chat -w @unrush/web",
     "test": "npm test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build": "npm run build -w @unrush/web"
+    "build": "npm run build -w @unrush/web",
+    "agentcore:setup": "npm run agentcore:setup -w @unrush/web"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

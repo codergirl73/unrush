@@ -18,6 +18,7 @@ import { offlineModel } from "./offlineModel.js";
 import { fallbackSpeech, proactiveInstruction, type AlertLike, type ServerEvent } from "./proactive.js";
 import { systemPrompt } from "./prompt.js";
 import { EVENING_RESCUE, activeSkillBlock, loadSkills, skillsCatalog, withSkills, type Skill } from "./skills.js";
+import { AgentCoreMemory, createAgentCoreClient, recallBlock } from "./agentcore.js";
 
 export interface AppOptions {
   config: Config;
@@ -26,10 +27,18 @@ export interface AppOptions {
   model?: ConverseClient;
   /** Agent Skills to load (default: the repo's skills/ folder). */
   skills?: Skill[];
+  /** AgentCore Memory (default: on when AGENTCORE_MEMORY_ID is set and not offline; null disables). */
+  longTerm?: AgentCoreMemory | null;
   log?: (msg: string) => void;
 }
 
-export function createApp({ config, bridge, model, skills = loadSkills(), log = console.log }: AppOptions) {
+export function createApp({ config, bridge, model, skills = loadSkills(), longTerm, log = console.log }: AppOptions) {
+  const agentcore =
+    longTerm !== undefined
+      ? longTerm
+      : config.agentcoreMemoryId && !config.offline
+        ? new AgentCoreMemory(createAgentCoreClient(config.region), config.agentcoreMemoryId, config.householdId)
+        : null;
   const tools = withSkills(bridge, skills);
   const rescue = skills.find((s) => s.name === EVENING_RESCUE);
   let today = "";
@@ -42,6 +51,7 @@ export function createApp({ config, bridge, model, skills = loadSkills(), log = 
 
   const status = () => ({
     skills: skills.map((s) => s.name),
+    memory: agentcore ? agentcore.name : "in-process (last N turns)",
     mcpUrl: config.mcpUrl,
     protocolVersion: bridge.protocolVersion ?? null,
     tools: bridge.listMcpTools().length,
@@ -58,10 +68,31 @@ export function createApp({ config, bridge, model, skills = loadSkills(), log = 
   };
 
   /** System prompt with the skills catalog; proactive turns also activate the evening-rescue skill. */
-  async function systemNow(proactive = false) {
+  async function systemNow(proactive = false, extra: string[] = []) {
     const now = await bridge.now();
     today = now.slice(0, 10);
-    return systemPrompt(now, [skillsCatalog(skills), proactive && rescue ? activeSkillBlock(rescue) : ""]);
+    return systemPrompt(now, [skillsCatalog(skills), proactive && rescue ? activeSkillBlock(rescue) : "", ...extra]);
+  }
+
+  /** Run an AgentCore Memory call best-effort, reporting it as a "memory" event. */
+  async function remember<T>(
+    action: "load" | "recall" | "save",
+    fn: (m: AgentCoreMemory) => Promise<T>,
+    describe: (r: T) => string,
+    emit: (e: AgentEvent) => void,
+  ): Promise<T | null> {
+    if (!agentcore) return null;
+    try {
+      const r = await fn(agentcore);
+      emit({ type: "memory", action, ok: true, detail: describe(r) });
+      return r;
+    } catch (err) {
+      const e = err as { name?: string; message?: string };
+      const detail = `${e.name ?? "Error"}: ${e.message ?? String(err)}`;
+      log(`[agentcore] ${action} failed: ${detail}`);
+      emit({ type: "memory", action, ok: false, detail });
+      return null;
+    }
   }
 
   // ---------- proactive ----------
@@ -100,7 +131,9 @@ export function createApp({ config, bridge, model, skills = loadSkills(), log = 
         fallback = true;
         log(`[proactive] model failed, spoke alert text instead: ${error}`);
       }
-      memory.broadcast({ user: "(Unrush spoke first about: " + alerts.map((a) => a.message).join(" ") + ")", assistant: reply });
+      const turn = { user: "(Unrush spoke first about: " + alerts.map((a) => a.message).join(" ") + ")", assistant: reply };
+      memory.broadcast(turn);
+      await remember("save", (m) => m.saveTurn(today, turn), () => "proactive turn saved", (event) => publish({ type: "agent", runId, source: "proactive", event }));
       publish({ type: "proactive_end", runId, reply, fallback, error });
       publish({ type: "state_changed" });
       return reply;
@@ -145,11 +178,18 @@ export function createApp({ config, bridge, model, skills = loadSkills(), log = 
     active++; // don't interrupt a conversation turn with a proactive one
     try {
       const runId = randomUUID();
+      today = (await bridge.now()).slice(0, 10);
+      // A new browser session (or a restarted backend) picks up today's conversation from AgentCore Memory.
+      if (agentcore && !memory.has(sessionId)) {
+        const turns = await remember("load", (m) => m.loadTurns(today, config.historyTurns), (t) => `${t.length} earlier turn(s) from today`, send);
+        if (turns?.length) memory.seed(sessionId, turns);
+      }
+      const recalled = await remember("recall", (m) => m.recall(userText), (r) => (r.length ? `${r.length} household preference(s)` : "nothing relevant"), send);
       const r = await runAgent({
         client,
         modelId,
         bridge: tools,
-        system: await systemNow(),
+        system: await systemNow(false, [recallBlock(recalled ?? [])]),
         history: memory.get(sessionId),
         userText,
         maxTokens: config.maxTokens,
@@ -159,7 +199,9 @@ export function createApp({ config, bridge, model, skills = loadSkills(), log = 
           if (event.type === "tool_call" || event.type === "tool_result") publish({ type: "agent", runId, source: "chat", event });
         },
       });
-      memory.add(sessionId, { user: userText, assistant: r.reply });
+      const turn = { user: userText, assistant: r.reply };
+      memory.add(sessionId, turn);
+      await remember("save", (m) => m.saveTurn(today, turn), () => "turn saved", send);
       publish({ type: "state_changed" });
     } catch (err) {
       const msg = explainBedrockError(err);

@@ -4,6 +4,7 @@ import { BoltIcon, ChevronIcon } from "./icons";
 export type ActivityItem =
   | { kind: "model"; iteration: number }
   | { kind: "interim"; text: string }
+  | { kind: "memory"; action: string; ok: boolean; detail: string }
   | { kind: "tool"; id: string; name: string; input: Record<string, unknown>; result?: { ok: boolean; ms: number; data: Record<string, unknown> } };
 
 export interface ActivityTurn {
@@ -55,6 +56,11 @@ export function ActivityPanel({ turns, offline }: { turns: ActivityTurn[]; offli
                   <li key={i} className="step model">
                     <span className="step-dot" />
                     {offline ? "Scripted model" : "Bedrock Converse"} · step {it.iteration}
+                  </li>
+                ) : it.kind === "memory" ? (
+                  <li key={i} className={`step memory ${it.ok ? "" : "fail"}`}>
+                    <span className="step-dot" />
+                    AgentCore Memory · {it.action} · {it.detail}
                   </li>
                 ) : it.kind === "interim" ? (
                   <li key={i} className="step interim">

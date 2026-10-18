@@ -39,6 +39,8 @@ function reduceTurn(t: ActivityTurn, e: AgentEvent): ActivityTurn {
       return { ...t, items: [...t.items, { kind: "model", iteration: e.iteration }] };
     case "interim":
       return { ...t, items: [...t.items, { kind: "interim", text: e.text }] };
+    case "memory":
+      return { ...t, items: [...t.items, { kind: "memory", action: e.action, ok: e.ok, detail: e.detail }] };
     case "tool_call":
       return { ...t, items: [...t.items, { kind: "tool", id: e.id, name: e.name, input: e.input }] };
     case "tool_result":
@@ -205,6 +207,7 @@ export function App() {
           <span className="chip-status">
             <i className={status?.protocolVersion ? "on" : "off"} /> MCP {status?.protocolVersion ?? "—"} · Streamable HTTP · {status?.tools ?? 0} tools
           </span>
+          {status?.memory?.startsWith("Amazon") && <span className="chip-status">AgentCore Memory</span>}
           <span className={`chip-status ${offline ? "warn" : ""}`}>{offline ? "Offline rehearsal (not Bedrock)" : `Amazon Bedrock · ${status?.model ?? "…"}`}</span>
           <div className="view-toggle" role="group" aria-label="Card view">
             <button className={view === "cards" ? "on" : ""} onClick={() => setView("cards")}>Cards</button>
