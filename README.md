@@ -7,7 +7,9 @@ Unrush is a proactive household assistant presented as a **simulated Alexa+ expe
 Built for **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track + AWS Builder mini challenge).
 
 - **Self-hosted MCP server:** spec **2025-11-25** over **Streamable HTTP**, built with the official TypeScript SDK `@modelcontextprotocol/sdk` **1.32.1**.
-- **Amazon Bedrock:** the Converse API runs the agent loop and calls the MCP tools.
+- **MCP Apps:** the server ships interactive `ui://` views (evening timeline, grocery order) via the official `@modelcontextprotocol/ext-apps`.
+- **Agent Skill:** `skills/unrush-evening-rescue/SKILL.md` (open Agent Skills format), loaded by the agent at runtime.
+- **Amazon Bedrock:** the Converse API runs the agent loop and calls the MCP tools. **Amazon Bedrock AgentCore Memory** (optional) keeps the conversation and household preferences across sessions and restarts.
 - TypeScript everywhere, Node 20+, npm workspaces, SQLite, Vitest. MIT licensed.
 
 > **What is real and what is simulated?** See [Real vs simulated](#real-vs-simulated). In short, the MCP server, the Bedrock agent, the prediction logic and the memory are real. The calendar data, the travel times and the checkout are simulated and labelled **Simulated** in the UI.
@@ -34,14 +36,17 @@ flowchart LR
     API["/api/chat · /api/state<br/>/api/events (SSE)"]
     Agent["Agent loop<br/>ConverseCommand ⇄ tools<br/>(≤ 8 iterations)"]
     Poller["Alert poller<br/>get_alerts every 3 s"]
+    Skills["Agent Skill<br/>SKILL.md + load_skill"]
+    AppsHost["MCP Apps host<br/>AppBridge (iframe)"]
     Bridge["McpBridge<br/>SDK Client +<br/>StreamableHTTPClientTransport"]
   end
   subgraph AWS["Amazon Bedrock"]
     Converse["Converse API<br/>(BEDROCK_MODEL_ID)"]
+    ACMem["AgentCore Memory<br/>events + preferences<br/>(optional)"]
   end
   subgraph MCP["Unrush MCP server (packages/mcp-server)"]
     HTTP["POST/GET/DELETE /mcp<br/>Mcp-Session-Id · spec 2025-11-25"]
-    Tools["16 tools · 2 resources"]
+    Tools["16 tools · 2 resources<br/>2 MCP Apps ui:// views"]
     Engine["Proactive checker<br/>every 60 s + on every write"]
     Providers["CalendarProvider → SimulatedCalendar<br/>TravelProvider → SimulatedTravel<br/>Clock"]
     DB[("SQLite<br/>UNRUSH_DB_PATH")]
@@ -52,6 +57,10 @@ flowchart LR
   API --> Agent
   Poller --> Agent
   Agent <--> Converse
+  Agent --> Skills
+  API <--> ACMem
+  UI --> AppsHost
+  AppsHost --> API
   Agent --> Bridge
   Poller --> Bridge
   Bridge <--> HTTP
@@ -104,6 +113,17 @@ flowchart LR
 - `unrush://households/{id}/pantry`
 - `unrush://households/{id}/schedule/today`
 
+**MCP Apps** (`@modelcontextprotocol/ext-apps` 1.7.5, the release line built for MCP SDK 1.x). The server registers two interactive views with `registerAppResource`, served as `text/html;profile=mcp-app`:
+
+| View | Linked tools (`_meta.ui.resourceUri`) | What it shows |
+|---|---|---|
+| `ui://unrush/evening.html` | `get_schedule` | Tonight's events (moved meeting vs its old end), the leave-by time, and tonight's dinner before → after. It calls `get_meal_plan` itself through the host |
+| `ui://unrush/order.html` | `build_grocery_order`, `get_order`, `place_order` | Items by aisle with reasons, plus a consent-first button |
+
+Any MCP Apps-capable chat host renders these views inline. Each view is one self-contained HTML file that inlines the official `App` runtime, follows the host theme and auto-resizes. The order view's button **does not** call `place_order`: it sends *"Yes, place the order."* as a user message, so the normal consent path decides.
+
+The Unrush web UI includes a small MCP Apps host (the official `AppBridge` + `PostMessageTransport`, in a sandboxed iframe). Flip **Cards → MCP Apps** in the header to see the same cards served by the MCP server. Tool calls from inside views are proxied for read-only tools only.
+
 **Proactive checker.** The checker runs every 60 s and immediately after any calendar, pantry, plan or order write. Its rules:
 - **(a) leave_by:** the departure is squeezed by the previous event (≤ 30 min of slack, or an overlap), or it is within 60 min.
 - **(b) meal_fit:** tonight's dinner `prep_minutes` is longer than the longest free stretch. The stretch runs from `cook_window_start` to `latest_dinner_time`, minus events and travel.
@@ -133,6 +153,16 @@ npx @modelcontextprotocol/inspector
 # Transport: Streamable HTTP · URL: http://localhost:3001/mcp → Connect → Tools → get_alerts {household_id: "demo-household"}
 ```
 
+## Agent Skill
+
+[`skills/unrush-evening-rescue/SKILL.md`](skills/unrush-evening-rescue/SKILL.md) is written in the open Agent Skills format: YAML front matter with `name` and `description`, a playbook body, and `references/consent.md`. It encodes the rescue order: leave-by first, then the dinner swap, then groceries, ordering only on an explicit yes.
+
+Any skills-aware agent can use it. In Unrush it is **loaded at runtime** by [`packages/web/server/skills.ts`](packages/web/server/skills.ts):
+1. Skills are discovered and their front matter validated at startup.
+2. The skill catalog (name + description) goes into the system prompt.
+3. A local `load_skill` tool gives progressive disclosure, including referenced files (with a path-escape check).
+4. Proactive turns activate the skill directly, so its playbook is always in context when Unrush speaks first.
+
 ## Where Amazon Bedrock is used
 
 Bedrock is on the live code path for every conversation turn and every proactive moment. It is not optional decoration.
@@ -144,6 +174,10 @@ Bedrock is on the live code path for every conversation turn and every proactive
 | [`packages/web/server/agent.ts`](packages/web/server/agent.ts) | Calls `ConverseCommand` with system prompt + history + tools. On `stopReason: "tool_use"` it runs each `toolUse` through MCP and sends back `toolResult` blocks (`json`, or `status: "error"`), repeating until `end_turn`. Capped at 8 model calls; `maxTokens` comes from `BEDROCK_MAX_TOKENS` |
 | [`packages/web/server/app.ts`](packages/web/server/app.ts) | Runs the agent for chat turns (`POST /api/chat`) and for proactive turns (alert poller), streaming every step to the UI |
 | [`packages/web/server/prompt.ts`](packages/web/server/prompt.ts) | Warm, brief voice persona anchored to the MCP server's clock: always use tools, short replies that can be spoken, never order without an explicit yes |
+| [`packages/web/server/agentcore.ts`](packages/web/server/agentcore.ts) | **Amazon Bedrock AgentCore Memory** (`@aws-sdk/client-bedrock-agentcore`), optional, on when `AGENTCORE_MEMORY_ID` is set. Each turn is saved with `CreateEvent` (USER/ASSISTANT conversational payloads; actor = household, session = household + day). A new browser session or a restarted backend reloads the day with `ListEvents`. `RetrieveMemoryRecords` pulls preferences that the memory's user-preference strategy extracted into the system prompt. Every call is best-effort and shown in the activity panel |
+| [`packages/web/server/agentcore-setup.ts`](packages/web/server/agentcore-setup.ts) | `npm run agentcore:setup` (`@aws-sdk/client-bedrock-agentcore-control`): `CreateMemory` with a user-preference strategy, then waits until it is ACTIVE and prints the `.env` line |
+
+**AWS services used:** Amazon Bedrock (Converse API) for the agent and tool use, and Amazon Bedrock AgentCore (Memory, data plane and control plane) for conversation and preference memory.
 
 The model is never hard-coded: set `BEDROCK_MODEL_ID` to a model or inference profile enabled in your account. Tool use is required. **Amazon Nova Lite** (`us.amazon.nova-lite-v1:0`) is the recommended small, cheap default.
 
@@ -163,13 +197,15 @@ The model is never hard-coded: set `BEDROCK_MODEL_ID` to a model or inference pr
 | Travel times | **Simulated:** fixed estimates per place (`SimulatedTravel`) |
 | Grocery store, checkout, confirmation number, ETA | **Simulated:** no store is contacted and no money moves. The UI labels them "Simulated store" and "Simulated confirmation" |
 | Six weeks of purchase history | **Simulated:** seeded so the prediction has data to learn from |
+| AgentCore Memory | **Real** when `AGENTCORE_MEMORY_ID` is set (your AWS account); otherwise in-process memory |
+| MCP Apps views | **Real** MCP Apps resources; the in-app host is a minimal reference host |
 | "Offline rehearsal" mode (`npm run dev:offline`) | A **scripted stand-in, not Bedrock**, for rehearsing the UI without AWS. Its MCP calls are real. The UI shows an orange "Offline rehearsal (not Bedrock)" badge whenever it is on |
 
 This is a **simulated Alexa+ experience** in a web browser. It is not an Alexa skill and does not use any Amazon device or Alexa service.
 
 ## Privacy
 
-- **Data stays local.** All household state is in a SQLite file on your machine. The only data that leaves it is the conversation and tool results sent to Amazon Bedrock in your own AWS account.
+- **Data stays local.** All household state is in a SQLite file on your machine. The only data that leaves it is the conversation and tool results sent to Amazon Bedrock and, if you turn it on, conversation turns stored in AgentCore Memory, both in your own AWS account.
 - **Nothing is bought without explicit consent.** Two independent checks enforce this (see above). Checkout is simulated anyway.
 - **No card data.** There are no payment fields or payment APIs anywhere, and nothing that stores card data. The simulated checkout only produces an order summary and a fake confirmation number.
 - `.env` and `*.db` are gitignored. Credentials are never written by the app.
@@ -187,7 +223,10 @@ git clone <this repo> && cd amazon-developer-hackathon
 npm install
 cp .env.example .env      # set AWS_REGION and BEDROCK_MODEL_ID; optionally UNRUSH_NOW=15:00
 npm run seed              # create / reset the demo household
+npm run agentcore:setup   # optional: create the AgentCore memory, then add AGENTCORE_MEMORY_ID to .env
 ```
+
+AgentCore Memory needs `bedrock-agentcore:CreateMemory`, `GetMemory` and `ListMemories` for the setup script, and `CreateEvent`, `ListEvents` and `RetrieveMemoryRecords` at runtime. Without it, Unrush uses in-process conversation memory; household state is always kept in the MCP server.
 
 ## Run
 
@@ -205,7 +244,7 @@ npm run seed              # reset everything for another take
 ## Test
 
 ```bash
-npm test          # 71 Vitest tests across both workspaces
+npm test          # 85 Vitest tests across both workspaces
 npm run typecheck
 ```
 
@@ -214,18 +253,22 @@ What the tests cover:
 - **Proactive rules,** dedupe and self-resolution.
 - **MCP integration:** the real HTTP server driven by the SDK client, checking that the negotiated protocol is `2025-11-25`, the tool and resource listing, the hero flow with the agent scripted, reconnect, and a server restart.
 - **Agent loop:** a fake Converse client against the real MCP server, including the order-consent gate and the 8-iteration cap.
+- **MCP Apps:** tool `_meta` links, resource MIME type and HTML, and host routes (views may call read-only tools only).
+- **Agent Skill:** front-matter validation, `load_skill` (including path escapes), and activation on proactive turns.
+- **AgentCore Memory:** command shapes against a fake data plane, continuity across a backend restart, recall in the prompt, and turns that still succeed when AgentCore fails.
 - **Phase 3 end to end:** late meeting → SSE proactive speech → swap → read-back → explicit yes → simulated confirmation, plus the fallback that still speaks first when the model is unavailable.
 
 ## Cost
 
-A full hero run is about 6–8 Converse calls of a few thousand input tokens each (mostly the 16 tool schemas). With Amazon Nova Lite that is a fraction of a cent per run; check current Bedrock pricing for your model and region. `BEDROCK_MAX_TOKENS` caps output per call, and token usage is shown per turn in the agent activity panel. Nothing else in the stack costs money.
+A full hero run is about 6–8 Converse calls of a few thousand input tokens each (mostly the 16 tool schemas). With Amazon Nova Lite that is a fraction of a cent per run; check current Bedrock pricing for your model and region. `BEDROCK_MAX_TOKENS` caps output per call, and token usage is shown per turn in the agent activity panel. AgentCore Memory, if enabled, adds a small per-event and per-retrieval charge (two or three calls per turn); check current AgentCore pricing. Nothing else in the stack costs money.
 
 ## Project layout
 
 ```
 packages/mcp-server   MCP server: transport, tools, proactive engine, providers, seed, demo trigger, tests
 packages/web/server   Express backend: MCP client bridge, Bedrock agent loop, consent gate, SSE, CLI
-packages/web/src      React UI: voice panel, cards, agent activity panel
+packages/web/src      React UI: voice panel, cards, MCP Apps host, agent activity panel
+skills/               Agent Skills (SKILL.md) loaded at runtime
 DEMO_SCRIPT.md        2:45 video script
 FRICTION_LOG.md       Friction hit with the MCP SDK, Streamable HTTP and Bedrock
 FEEDBACK_NOTES.md     What worked well / what needs work

@@ -31,6 +31,12 @@ Every tool has a zod input schema and a structured output schema, and each call 
 - `unrush://households/{household_id}/pantry`
 - `unrush://households/{household_id}/schedule/today`
 
+**MCP Apps** (`@modelcontextprotocol/ext-apps` 1.7.5):
+- `ui://unrush/evening.html`, linked to `get_schedule`
+- `ui://unrush/order.html`, linked to `build_grocery_order`, `get_order` and `place_order`
+
+Both are self-contained HTML (`text/html;profile=mcp-app`) using the official `App` runtime. The order view asks for consent through a chat message; it never calls `place_order` itself.
+
 ## Proactive checker
 
 The checker runs every 60 s inside the server. It also runs right after any calendar, pantry, plan or order write. Rules:
