@@ -271,14 +271,26 @@ packages/mcp-server   MCP server: transport, tools, proactive engine, providers,
 packages/web/server   Express backend: MCP client bridge, Bedrock agent loop, consent gate, SSE, CLI
 packages/web/src      React UI: voice panel, cards, MCP Apps host, agent activity panel
 skills/               Agent Skills (SKILL.md) loaded at runtime
+docs/ALEXA_PLUS.md    Alexa+ MCP Toolkit readiness and path to a live add-on
 DEMO_SCRIPT.md        2:45 video script
 FRICTION_LOG.md       Friction hit with the MCP SDK, Streamable HTTP and Bedrock
 FEEDBACK_NOTES.md     What worked well / what needs work
 ```
 
+## Alexa+ readiness
+
+Alexa+ add-ons connect through the **Alexa+ MCP Toolkit**, which requires an MCP server on spec **2025-11-25** over **Streamable HTTP**, and supports **MCP Apps**. Those are exactly what Unrush's server implements. What a live add-on still needs:
+- a public HTTPS URL;
+- OAuth 2.1 with PKCE for account linking;
+- Amazon Wallet checkout endpoints in place of the simulated checkout;
+- Private Preview access.
+
+See **[docs/ALEXA_PLUS.md](docs/ALEXA_PLUS.md)** for a requirement-by-requirement comparison with Amazon's docs, the exact path (`alexa-ai new mcp … && alexa-ai deploy`), and draft add-on metadata.
+
 ## Coming next
 
 Out of scope for the hackathon build and not implemented:
+- **Live on Alexa+:** connect this MCP server through the Alexa+ MCP Toolkit (public hosting + OAuth 2.1), and move checkout to Amazon Wallet so Alexa+ handles payment and confirmation. See [docs/ALEXA_PLUS.md](docs/ALEXA_PLUS.md)
 - **Real integrations:** Google Calendar (`CalendarProvider`) and live travel times (`TravelProvider`), behind env flags
 - **Fitness and workouts**
 - **Body tracking**
