@@ -165,9 +165,19 @@ function textOf(blocks: ContentBlock[]): string {
   );
 }
 
-/** Some models (e.g. Amazon Nova) emit <thinking>…</thinking> before the answer; it must never be spoken. */
+/**
+ * Replies are spoken aloud. Remove what must never be spoken: <thinking>…</thinking>
+ * blocks (Amazon Nova), markdown emphasis/code markers and list bullets.
+ */
 export function stripThinking(text: string): string {
-  return text.replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "").trim();
+  return text
+    .replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "")
+    .replace(/(\*\*|__)(.+?)\1/g, "$2")
+    .replace(/(^|[\s(])[*_](?!\s)([^*_\n]+?)[*_](?=[\s).,!?;:]|$)/g, "$1$2")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^\s*(?:[-*•]|\d+\.)\s+/gm, "")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
 }
 
 function fallbackReply(stop?: string): string {

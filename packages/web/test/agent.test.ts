@@ -224,3 +224,13 @@ describe("prompt + errors", () => {
     expect(explainBedrockError({ name: "AccessDeniedException", message: "no" })).toMatch(/model access/);
   });
 });
+
+describe("speakable replies", () => {
+  it("strips thinking, markdown emphasis, code and list bullets", async () => {
+    const { stripThinking } = await import("../server/agent.js");
+    expect(stripThinking("<thinking>plan</thinking>I can make **Tomato & garlic spaghetti** in 15 minutes.")).toBe("I can make Tomato & garlic spaghetti in 15 minutes.");
+    expect(stripThinking("Use the *quick* one, `SIM-1` placed.")).toBe("Use the quick one, SIM-1 placed.");
+    expect(stripThinking("- 12 eggs\n- 2 l milk")).toBe("12 eggs\n2 l milk");
+    expect(stripThinking("5 * 3 = 15 and 2*4")).toBe("5 * 3 = 15 and 2*4");
+  });
+});
