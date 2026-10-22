@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { clock, fetchState, newSessionId, resetSession, streamChat } from "./api";
+import { clock, fetchState, newSessionId, resetDemo, resetSession, runMeetingLate, startSession, streamChat } from "./api";
 import { ActivityPanel, type ActivityItem, type ActivityTurn } from "./components/ActivityPanel";
+import { DemoGuide, demoStep } from "./components/DemoGuide";
 import { AlertBanner, DinnerCard, OrderCard, PantryCard, RunoutCard, TimelineCard } from "./components/Cards";
-import { Logo, MoonIcon, SunIcon } from "./components/icons";
+import { ChipIcon, Logo, MoonIcon, SunIcon } from "./components/icons";
 import { McpAppFrame } from "./components/McpAppFrame";
 import { VoicePanel, type ChatMessage } from "./components/VoicePanel";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
@@ -71,6 +72,10 @@ export function App() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [sessionId, setSessionId] = useState(newSessionId);
   const [view, setView] = useState<"cards" | "apps">("cards");
+  /** The backend knows this browser (hosted demo: its own household). */
+  const [ready, setReady] = useState(false);
+  /** Unrush is speaking first (or about to, after the late meeting). */
+  const [proactive, setProactive] = useState(false);
   const [appResults, setAppResults] = useState<{ schedule: CallToolResult | null; order: CallToolResult | null }>({ schedule: null, order: null });
   const speaker = useSpeaker();
   const speakRef = useRef(speaker.speak);
@@ -85,6 +90,20 @@ export function App() {
     }
   }, [theme]);
 
+  const connect = useCallback(async () => {
+    try {
+      await startSession();
+      setReady(true);
+      setError(null);
+    } catch (err) {
+      setError((err as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    void connect();
+  }, [connect]);
+
   const refresh = useCallback(async () => {
     try {
       const s = await fetchState();
@@ -92,9 +111,13 @@ export function App() {
       setStatus(s.status);
       setError(null);
     } catch (err) {
-      setError((err as Error).message);
+      // The hosted demo forgot this browser (its household expired): start a new one.
+      if ((err as { status?: number }).status === 401) {
+        setReady(false);
+        void connect();
+      } else setError((err as Error).message);
     }
-  }, []);
+  }, [connect]);
 
   const pulse = useCallback((tool: string) => {
     const card = CARD_FOR_TOOL[tool];
@@ -114,20 +137,31 @@ export function App() {
     if (bits.length) setMessages((m) => (m.length ? m : [{ role: "assistant", text: `Welcome back. I still remember ${bits.join(", ")}. It's all saved in the MCP server.` }]));
   }, [state]);
 
+  /** Clear the conversation on screen (the demo was reset). */
+  const clearScreen = useCallback(() => {
+    setMessages([]);
+    setTurns([]);
+    setBanner(null);
+    setProactive(false);
+    greeted.current = true;
+  }, []);
+
   // Initial load + a light poll so changes made outside this tab (e.g. demo:trigger) show up.
   useEffect(() => {
+    if (!ready) return;
     void refresh();
     const t = setInterval(refresh, 4000);
     return () => clearInterval(t);
-  }, [refresh]);
+  }, [ready, refresh]);
 
   // Proactive channel: Unrush speaks first.
   useEffect(() => {
-    const es = new EventSource("/api/events");
-    es.onmessage = (msg) => {
+    if (!ready) return;
+    const onMessage = (msg: MessageEvent<string>) => {
       const e = JSON.parse(msg.data) as ServerEvent;
       if (e.type === "status") setStatus(e.status);
       else if (e.type === "proactive_start") {
+        setProactive(true);
         setBanner({ alerts: e.alerts, text: null });
         setTurns((ts) => [...ts, { id: e.runId, user: `Unrush spoke first: ${e.alerts.map((a) => a.title).join(" · ")}`, proactive: true, items: [] }]);
         void refresh();
@@ -135,14 +169,65 @@ export function App() {
         setTurns((ts) => ts.map((t) => (t.id === e.runId ? reduceTurn(t, e.event) : t)));
         if (e.event.type === "tool_result") pulse(e.event.name);
       } else if (e.type === "proactive_end") {
+        setProactive(false);
         setBanner((b) => (b ? { ...b, text: e.reply } : b));
         setMessages((m) => [...m, { role: "assistant", text: e.reply }]);
         setTurns((ts) => ts.map((t) => (t.id === e.runId ? { ...t, reply: e.reply, error: e.fallback ? `Model unavailable, spoke the alert text instead. ${e.error ?? ""}` : t.error } : t)));
         speakRef.current(e.reply);
       } else if (e.type === "state_changed") void refresh();
+      else if (e.type === "reset") clearScreen();
     };
-    return () => es.close();
-  }, [refresh, pulse]);
+    // A browser gives up on an EventSource after an error response (e.g. while the backend
+    // restarts behind a proxy), so reopen it ourselves.
+    let es: EventSource | null = null;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    let stopped = false;
+    const open = () => {
+      es = new EventSource("/api/events");
+      es.onmessage = onMessage;
+      es.onerror = () => {
+        if (es?.readyState === EventSource.CLOSED && !stopped) {
+          retry = setTimeout(() => {
+            open();
+            void refresh();
+          }, 2000);
+        }
+      };
+    };
+    open();
+    return () => {
+      stopped = true;
+      clearTimeout(retry);
+      es?.close();
+    };
+  }, [ready, refresh, pulse, clearScreen]);
+
+  const runLate = useCallback(async () => {
+    setProactive(true);
+    // If Unrush doesn't speak (lost connection, server error), don't leave the guide stuck on "working".
+    setTimeout(() => setProactive((p) => (p ? false : p)), 45_000);
+    try {
+      await runMeetingLate();
+      pulse("add_or_update_event");
+      void refresh();
+    } catch (err) {
+      setProactive(false);
+      setMessages((m) => [...m, { role: "error", text: (err as Error).message }]);
+    }
+  }, [pulse, refresh]);
+
+  const startOver = useCallback(async () => {
+    window.speechSynthesis?.cancel();
+    try {
+      await resetDemo();
+      clearScreen();
+      await resetSession(sessionId);
+      setSessionId(newSessionId());
+      void refresh();
+    } catch (err) {
+      setMessages((m) => [...m, { role: "error", text: (err as Error).message }]);
+    }
+  }, [clearScreen, sessionId, refresh]);
 
   const send = useCallback(
     async (text: string) => {
@@ -191,6 +276,9 @@ export function App() {
   }, [view, stateKey]);
 
   const offline = status?.offline ?? false;
+  const publicDemo = status?.publicDemo ?? false;
+  const step = state ? demoStep(state) : null;
+  const working = busy || proactive;
 
   return (
     <div className="app">
@@ -203,12 +291,19 @@ export function App() {
           </div>
         </div>
         <div className="status">
-          {state && <span className="chip-status clock">{new Date(`${state.schedule.date}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })} {clock(state.schedule.now)}</span>}
-          <span className="chip-status">
-            <i className={status?.protocolVersion ? "on" : "off"} /> MCP {status?.protocolVersion ?? "—"} · Streamable HTTP · {status?.tools ?? 0} tools
-          </span>
-          {status?.memory?.startsWith("Amazon") && <span className="chip-status">AgentCore Memory</span>}
-          <span className={`chip-status ${offline ? "warn" : ""}`}>{offline ? "Offline rehearsal (not Bedrock)" : `Amazon Bedrock · ${status?.model ?? "…"}`}</span>
+          <div className="tech" aria-label="What's running">
+            <ChipIcon width={15} height={15} />
+            <span title={`${status?.tools ?? 0} tools over Streamable HTTP`}>
+              <i className={status?.protocolVersion ? "on" : "off"} /> MCP {status?.protocolVersion ?? "—"}
+            </span>
+            <span className={offline ? "warn" : ""} title={status?.model}>{offline ? "Offline rehearsal (not Bedrock)" : "Amazon Bedrock · Nova"}</span>
+            {status?.memory?.startsWith("Amazon") && <span>AgentCore Memory</span>}
+          </div>
+          {state && (
+            <span className="chip-status clock" title="The demo clock: every visit starts at 3pm">
+              <span className="clock-day">{new Date(`${state.schedule.date}T00:00:00Z`).toLocaleDateString(undefined, { weekday: "short", timeZone: "UTC" })}</span> {clock(state.schedule.now)}
+            </span>
+          )}
           <div className="view-toggle" role="group" aria-label="Card view">
             <button className={view === "cards" ? "on" : ""} onClick={() => setView("cards")}>Cards</button>
             <button className={view === "apps" ? "on" : ""} onClick={() => setView("apps")} title="The same cards, served by the MCP server as MCP Apps (ui:// resources)">MCP Apps</button>
@@ -219,7 +314,9 @@ export function App() {
         </div>
       </header>
 
-      {banner && <AlertBanner alerts={banner.alerts} text={banner.text} onClose={() => setBanner(null)} />}
+      {step && <DemoGuide step={step} working={working} onLate={runLate} onSay={send} onReset={startOver} />}
+      {/* The banner is the "speaks first" moment; once the story moves on, the guide takes over. */}
+      {banner && (step?.index ?? 0) <= 1 && <AlertBanner alerts={banner.alerts} text={banner.text} onClose={() => setBanner(null)} />}
       {error && <div className="error-bar">{error}</div>}
       {status?.problems?.length ? <div className="error-bar">{status.problems.join(" ")}</div> : null}
 
@@ -232,6 +329,8 @@ export function App() {
           onToggleMute={speaker.toggleMute}
           onSend={send}
           onNewSession={newSession}
+          suggestions={step?.suggestions ?? []}
+          intro="Hi, I'm Unrush. It's 3pm: you have a 5:30 project sync, a study group across town at 7:30, and a 45-minute curry planned for dinner. Make the meeting run late (button above) and I'll speak up as soon as your evening stops adding up."
         />
         <div className="cards">
           {state && view === "apps" ? (
@@ -252,13 +351,14 @@ export function App() {
               </div>
             </>
           ) : (
-            <div className="card empty">Connecting to the Unrush backend…</div>
+            <div className="card empty">{error ? "Can't reach Unrush right now." : publicDemo || !ready ? "Setting up your own demo household…" : "Connecting to the Unrush backend…"}</div>
           )}
         </div>
         <ActivityPanel turns={turns} offline={offline} />
       </main>
       <footer className="foot">
-        Calendar, travel times and checkout are <b>simulated</b>. Data stays on this machine; nothing is bought without your explicit yes and no card data is ever handled.
+        Calendar, travel times and checkout are <b>simulated</b>; the AI, the MCP server and the Amazon product links are real. Nothing is bought without your explicit yes, and no card data is ever handled.
+        {publicDemo ? " This browser has its own demo household, deleted after 24 hours." : " Data stays on this machine."}
       </footer>
     </div>
   );

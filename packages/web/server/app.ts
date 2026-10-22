@@ -23,7 +23,7 @@ import { cookieValue, DailyCap, RateWindow } from "./limits.js";
 import type { McpBridge } from "./mcpBridge.js";
 import { ConversationMemory } from "./memory.js";
 import { offlineModel } from "./offlineModel.js";
-import { fallbackSpeech, proactiveInstruction, type AlertLike, type ServerEvent } from "./proactive.js";
+import { fallbackSpeech, proactiveInstruction, type AlertLike, type QuickMeal, type ServerEvent } from "./proactive.js";
 import { systemPrompt } from "./prompt.js";
 import { EVENING_RESCUE, activeSkillBlock, loadSkills, skillsCatalog, withSkills, type Skill } from "./skills.js";
 import { AgentCoreMemory, createAgentCoreClient, recallBlock } from "./agentcore.js";
@@ -153,9 +153,10 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
       const runId = randomUUID();
       log(`[proactive] ${h.id}: ${alerts.map((a) => a.kind).join(", ")}`);
       publish(h, { type: "proactive_start", runId, alerts });
-      const instruction = proactiveInstruction(alerts);
       /** Tool facts the next turn needs (e.g. the suggested recipe_id), since history keeps only spoken text. */
       const facts: string[] = [];
+      const suggestion = await quickMealFor(h, runId, alerts, facts);
+      const instruction = proactiveInstruction(alerts, suggestion);
       let reply: string;
       let fallback = false;
       let error: string | undefined;
@@ -194,6 +195,30 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
       return reply;
     } finally {
       h.active--;
+    }
+  }
+
+  /**
+   * When dinner no longer fits, look up the quick meal over MCP before the model speaks, so the
+   * offer is always a real recipe from the pantry (shown in the activity panel like any tool call).
+   */
+  async function quickMealFor(h: Household, runId: string, alerts: AlertLike[], facts: string[]): Promise<QuickMeal | undefined> {
+    const meal = alerts.find((a) => a.kind === "meal_fit");
+    if (!meal) return undefined;
+    const id = randomUUID();
+    const input = { max_minutes: Number(meal.data.suggested_max_minutes ?? 15) };
+    const emit = (event: AgentEvent) => publish(h, { type: "agent", runId, source: "proactive", event });
+    emit({ type: "tool_call", id, name: "suggest_quick_meal", input });
+    const t0 = Date.now();
+    try {
+      const out = await h.bridge.callTool("suggest_quick_meal", input);
+      emit({ type: "tool_result", id, name: "suggest_quick_meal", ok: out.ok, ms: Date.now() - t0, data: out.data });
+      if (!out.ok) return undefined;
+      facts.push(...factsFrom("suggest_quick_meal", out.data));
+      return (out.data.suggestions as QuickMeal[] | undefined)?.[0];
+    } catch (err) {
+      emit({ type: "tool_result", id, name: "suggest_quick_meal", ok: false, ms: Date.now() - t0, data: { error: (err as Error).message } });
+      return undefined;
     }
   }
 

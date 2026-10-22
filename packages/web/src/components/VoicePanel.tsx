@@ -9,13 +9,6 @@ export interface ChatMessage {
 
 export type OrbState = "idle" | "listening" | "thinking" | "speaking";
 
-const SUGGESTIONS = [
-  "What's my evening look like?",
-  "We're out of eggs",
-  "What do we need from the store?",
-  "When do I need to leave?",
-];
-
 interface Props {
   messages: ChatMessage[];
   busy: boolean;
@@ -24,9 +17,13 @@ interface Props {
   onToggleMute: () => void;
   onSend: (text: string) => void;
   onNewSession: () => void;
+  /** Replies that move the story on, shown as chips above the composer. */
+  suggestions: string[];
+  /** Shown before the conversation starts. */
+  intro?: string;
 }
 
-export function VoicePanel({ messages, busy, speaking, muted, onToggleMute, onSend, onNewSession }: Props) {
+export function VoicePanel({ messages, busy, speaking, muted, onToggleMute, onSend, onNewSession, suggestions, intro }: Props) {
   const [text, setText] = useState("");
   const ptt = usePushToTalk((t) => !busy && onSend(t));
   const scroller = useRef<HTMLDivElement>(null);
@@ -85,25 +82,18 @@ export function VoicePanel({ messages, busy, speaking, muted, onToggleMute, onSe
           <span className="ring r1" />
           <span className="ring r2" />
           <span className="orb-core">
-            <MicIcon width={34} height={34} />
+            <MicIcon width={26} height={26} />
           </span>
         </button>
-        <div className="orb-label">{label}</div>
-        {ptt.supported && state === "idle" && <div className="orb-hint">or hold Space</div>}
-        {ptt.error && <div className="mic-error">{ptt.error}</div>}
+        <div className="orb-text">
+          <div className="orb-label">{label}</div>
+          {ptt.supported && state === "idle" && <div className="orb-hint">Press and hold the mic, or hold Space</div>}
+          {ptt.error && <div className="mic-error">{ptt.error}</div>}
+        </div>
       </div>
 
       <div className="transcript" ref={scroller}>
-        {messages.length === 0 && !ptt.interim && (
-          <div className="suggestions">
-            <div className="suggest-label">Try saying</div>
-            {SUGGESTIONS.map((s) => (
-              <button key={s} className="suggestion" onClick={() => onSend(s)} disabled={busy}>
-                “{s}”
-              </button>
-            ))}
-          </div>
-        )}
+        {messages.length === 0 && !ptt.interim && intro && <div className="bubble assistant intro">{intro}</div>}
         {messages.map((m, i) => (
           <div key={i} className={`bubble ${m.role}`}>
             {m.text}
@@ -118,6 +108,16 @@ export function VoicePanel({ messages, busy, speaking, muted, onToggleMute, onSe
           </div>
         )}
       </div>
+
+      {suggestions.length > 0 && !busy && (
+        <div className="quick-replies" aria-label="Suggested replies">
+          {suggestions.map((s) => (
+            <button key={s} className="quick-reply" onClick={() => onSend(s)}>
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       <form className="composer" onSubmit={submit}>
         <input

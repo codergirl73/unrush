@@ -23,11 +23,18 @@ function script(userText: string, lastAssistant: string, today: string): Step[] 
     const max = Number(/max_minutes (\d+)/.exec(userText)?.[1] ?? 15);
     const leave = /leave_by: (.+)/.exec(userText)?.[1] ?? "";
     const hasMeal = userText.includes("meal_fit:");
+    // The backend usually looked the quick meal up already and put it in the instruction.
+    const given = /already found the best quick meal: "([^"]+)" \((\d+) minutes/.exec(userText);
     return [
-      { tools: () => [["compute_leave_by", { event_id: "evt-study-group" }], ...(hasMeal ? ([["suggest_quick_meal", { max_minutes: max }]] as Array<[string, Record<string, unknown>]>) : [])] },
+      {
+        tools: () => [
+          ["compute_leave_by", { event_id: "evt-study-group" }],
+          ...(hasMeal && !given ? ([["suggest_quick_meal", { max_minutes: max }]] as Array<[string, Record<string, unknown>]>) : []),
+        ],
+      },
       {
         reply: (r) => {
-          const quick = r.find((x) => x.suggestions)?.suggestions?.[0];
+          const quick = given ? { name: given[1]!, prep_minutes: Number(given[2]) } : r.find((x) => x.suggestions)?.suggestions?.[0];
           const meal = quick ? ` Your curry won't fit tonight. Want me to swap in ${lower(quick.name)}? It takes ${quick.prep_minutes} minutes and you have everything.` : "";
           return `${leave}${meal}`.trim();
         },

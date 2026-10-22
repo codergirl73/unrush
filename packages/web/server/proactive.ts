@@ -15,17 +15,27 @@ export interface AlertLike {
 
 export const PROACTIVE_MARKER = "[PROACTIVE]";
 
+/** A quick meal the backend already fetched with suggest_quick_meal (so the model can't invent one). */
+export interface QuickMeal {
+  recipe_id: string;
+  name: string;
+  prep_minutes: number;
+  missing: Array<{ item: string }>;
+}
+
 /** The instruction the agent receives in place of a user message when Unrush speaks first. */
-export function proactiveInstruction(alerts: AlertLike[]): string {
+export function proactiveInstruction(alerts: AlertLike[], suggestion?: QuickMeal): string {
   const lines = alerts.map((a) => `- ${a.kind}: ${a.message}`);
   const meal = alerts.find((a) => a.kind === "meal_fit");
   const runoutOnly = alerts.every((a) => a.kind === "runout");
   const steps = [
     "Speak first: the user has not said anything. In two or three short sentences:",
     alerts.some((a) => a.kind === "leave_by") ? "1. Say what changed and exactly when they need to leave." : "",
-    meal
-      ? `2. Tonight's dinner no longer fits: call suggest_quick_meal with max_minutes ${Number(meal.data.suggested_max_minutes ?? 15)}, and offer the top suggestion using its exact name and prep time from the tool result.`
-      : "",
+    meal && suggestion
+      ? `2. Tonight's dinner no longer fits. suggest_quick_meal already found the best quick meal: "${suggestion.name}" (${suggestion.prep_minutes} minutes${suggestion.missing.length ? `, needs ${suggestion.missing.map((m) => m.item).join(", ")}` : ", everything is in the pantry"}). Offer exactly that meal by that name; don't call any tools and don't name any other dish.`
+      : meal
+        ? `2. Tonight's dinner no longer fits: call suggest_quick_meal with max_minutes ${Number(meal.data.suggested_max_minutes ?? 15)}, and offer the top suggestion using its exact name and prep time from the tool result.`
+        : "",
     runoutOnly ? "Mention what is out or running low and offer to put a grocery order together." : "",
     "End with ONE yes/no question. Do not change the plan, and do not build or place any order yet.",
   ].filter(Boolean);

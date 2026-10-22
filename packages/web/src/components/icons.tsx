@@ -129,3 +129,16 @@ export const CloseIcon = (p: SVGProps<SVGSVGElement>) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </svg>
 );
+
+export const PlayIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M7 5v14l11-7z" fill="currentColor" />
+  </svg>
+);
+
+export const ChipIcon = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <rect x="6" y="6" width="12" height="12" rx="2" />
+    <path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4" />
+  </svg>
+);

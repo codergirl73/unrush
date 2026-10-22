@@ -26,7 +26,8 @@ export type ServerEvent =
   | { type: "proactive_start"; runId: string; alerts: Alert[] }
   | { type: "agent"; runId: string; source: "proactive" | "chat"; event: AgentEvent }
   | { type: "proactive_end"; runId: string; reply: string; fallback: boolean; error?: string }
-  | { type: "state_changed" };
+  | { type: "state_changed" }
+  | { type: "reset" };
 
 export interface Status {
   mcpUrl: string;
@@ -36,6 +37,8 @@ export interface Status {
   model: string;
   region: string;
   offline: boolean;
+  /** Hosted demo: a household per visitor. */
+  publicDemo?: boolean;
   problems: string[];
   memory?: string;
   skills?: string[];

@@ -120,6 +120,16 @@ describe("proactive wiring", () => {
     expect(text).toMatch(/do not build or place any order/i);
   });
 
+  it("hands the model the quick meal it already looked up, so it can't invent a dish", () => {
+    const text = proactiveInstruction(
+      [{ id: "b", kind: "meal_fit", title: "", message: "Curry won't fit.", data: { suggested_max_minutes: 15 } }],
+      { recipe_id: "tomato-garlic-spaghetti", name: "Tomato & garlic spaghetti", prep_minutes: 15, missing: [] },
+    );
+    expect(text).toContain('"Tomato & garlic spaghetti" (15 minutes, everything is in the pantry)');
+    expect(text).toMatch(/don't call any tools and don't name any other dish/);
+    expect(text).not.toContain("call suggest_quick_meal");
+  });
+
   it("stays quiet when nothing is pending", async () => {
     expect(await app.pollAlerts()).toBeNull();
   });
@@ -134,7 +144,8 @@ describe("proactive wiring", () => {
     const start = events.find((e) => e.type === "proactive_start") as Extract<ServerEvent, { type: "proactive_start" }>;
     expect(start.alerts.map((a) => a.kind)).toEqual(["leave_by", "meal_fit"]);
     const tools = events.flatMap((e) => (e.type === "agent" && e.event.type === "tool_call" ? [e.event.name] : []));
-    expect(tools).toEqual(["compute_leave_by", "suggest_quick_meal"]);
+    // The backend looks up the quick meal over MCP first, so the model can only offer a real recipe.
+    expect(tools).toEqual(["suggest_quick_meal", "compute_leave_by"]);
     const end = events.find((e) => e.type === "proactive_end") as Extract<ServerEvent, { type: "proactive_end" }>;
     expect(end.fallback).toBe(false);
     expect(end.reply).toBe(spoken);

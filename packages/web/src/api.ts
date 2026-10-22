@@ -3,9 +3,27 @@ import type { AgentEvent, AppState } from "./types";
 export async function fetchState(): Promise<AppState> {
   const res = await fetch("/api/state");
   const body = await res.json();
-  if (!res.ok) throw new Error(body.error ?? "Backend unavailable");
+  if (!res.ok) throw Object.assign(new Error(body.error ?? "Backend unavailable"), { status: res.status });
   return body as AppState;
 }
+
+/** Start (or resume) this browser's household. On the hosted demo each browser gets its own. */
+export async function startSession(): Promise<{ householdId: string; publicDemo: boolean }> {
+  const res = await fetch("/api/session", { method: "POST" });
+  const body = await res.json();
+  if (!res.ok) throw new Error(body.error ?? `Could not start a demo session (${res.status})`);
+  return body;
+}
+
+async function demo(path: string): Promise<void> {
+  const res = await fetch(`/api/demo/${path}`, { method: "POST" });
+  if (!res.ok) throw new Error(((await res.json().catch(() => ({}))) as { error?: string }).error ?? `Request failed (${res.status})`);
+}
+
+/** The demo's "late meeting": today's 5:30pm meeting now runs to 7pm (sent over MCP). */
+export const runMeetingLate = () => demo("late-meeting");
+/** Start the demo day again at 3pm. */
+export const resetDemo = () => demo("reset");
 
 /** POST a message and stream back AgentEvents (server-sent events over a fetch body). */
 export async function streamChat(sessionId: string, message: string, onEvent: (e: AgentEvent) => void): Promise<void> {
