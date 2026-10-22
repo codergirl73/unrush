@@ -23,7 +23,7 @@ for (let attempt = 1; ; attempt++) {
   }
 }
 
-const { app, pollAlerts } = createApp({ config, bridge, log });
+const { app, pollAll } = createApp({ config, bridge, log });
 
 const dist = resolve(dirname(fileURLToPath(import.meta.url)), "../dist");
 if (existsSync(dist)) {
@@ -31,13 +31,13 @@ if (existsSync(dist)) {
   app.get(/^\/(?!api\/).*/, (_req, res) => res.sendFile(resolve(dist, "index.html")));
 }
 
-app.listen(config.port, "127.0.0.1", () => {
-  log(`API on http://127.0.0.1:${config.port}  model=${config.offline ? "OFFLINE REHEARSAL (not Bedrock)" : config.modelId} region=${config.region}`);
+app.listen(config.port, config.host, () => {
+  log(`API on http://${config.host}:${config.port}${config.publicDemo ? " (public demo: a household per visitor)" : ""}  model=${config.offline ? "OFFLINE REHEARSAL (not Bedrock)" : config.modelId} region=${config.region}`);
   for (const p of configProblems(config)) log(`⚠ ${p}`);
 });
 
 const timer = setInterval(() => {
-  pollAlerts().catch((err) => log(`alert poll failed: ${(err as Error).message}`));
+  pollAll().catch((err) => log(`alert poll failed: ${(err as Error).message}`));
 }, config.alertPollMs);
 const shutdown = async () => {
   clearInterval(timer);

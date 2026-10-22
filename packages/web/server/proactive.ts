@@ -42,4 +42,6 @@ export type ServerEvent =
   | { type: "proactive_start"; runId: string; alerts: AlertLike[] }
   | { type: "agent"; runId: string; source: "proactive" | "chat"; event: AgentEvent }
   | { type: "proactive_end"; runId: string; reply: string; fallback: boolean; error?: string }
-  | { type: "state_changed" };
+  | { type: "state_changed" }
+  /** The demo household was re-seeded: clear the conversation on screen. */
+  | { type: "reset" };

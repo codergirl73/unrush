@@ -20,35 +20,73 @@ export interface ToolCallOutcome {
 
 type JsonSchema = Record<string, unknown> & { properties?: Record<string, unknown>; required?: string[] };
 
+/** One MCP session, shared by every household's bridge. */
+interface Connection {
+  client?: Client;
+  transport?: StreamableHTTPClientTransport;
+  tools: McpTool[];
+}
+
 export class McpBridge {
-  private client?: Client;
-  private transport?: StreamableHTTPClientTransport;
-  private tools: McpTool[] = [];
+  private readonly conn: Connection;
 
   constructor(
     private readonly url: string,
     readonly householdId: string,
     private readonly log: (msg: string) => void = (m) => console.log(m),
-  ) {}
+    conn?: Connection,
+  ) {
+    this.conn = conn ?? { tools: [] };
+  }
+
+  /** The same MCP session, acting for another household (public demo: one per visitor). */
+  forHousehold(householdId: string): McpBridge {
+    return householdId === this.householdId ? this : new McpBridge(this.url, householdId, this.log, this.conn);
+  }
+
+  private get client() {
+    return this.conn.client;
+  }
+
+  private get tools() {
+    return this.conn.tools;
+  }
 
   get protocolVersion(): string | undefined {
-    return this.transport?.protocolVersion;
+    return this.conn.transport?.protocolVersion;
   }
 
   async connect(): Promise<void> {
-    this.client = new Client({ name: "unrush-web", version: "0.1.0" });
-    this.transport = new StreamableHTTPClientTransport(new URL(this.url));
-    await this.client.connect(this.transport);
-    const { tools } = await this.client.listTools();
-    this.tools = tools;
-    this.log(
-      `[mcp] connected ${this.url} session=${this.transport.sessionId?.slice(0, 8)} protocol=${this.transport.protocolVersion} tools=${tools.length}`,
-    );
+    const client = new Client({ name: "unrush-web", version: "0.1.0" });
+    const transport = new StreamableHTTPClientTransport(new URL(this.url));
+    await client.connect(transport);
+    const { tools } = await client.listTools();
+    Object.assign(this.conn, { client, transport, tools });
+    this.log(`[mcp] connected ${this.url} session=${transport.sessionId?.slice(0, 8)} protocol=${transport.protocolVersion} tools=${tools.length}`);
   }
 
   async close(): Promise<void> {
-    await this.transport?.terminateSession().catch(() => {});
-    await this.client?.close().catch(() => {});
+    await this.conn.transport?.terminateSession().catch(() => {});
+    await this.conn.client?.close().catch(() => {});
+  }
+
+  // ---------- demo households (plain HTTP beside /mcp on the MCP server; never exposed to the model) ----------
+
+  /** Seed (or re-seed) a household. No id: the MCP server creates a new visitor household. */
+  async seedHousehold(householdId?: string, startAt?: string): Promise<{ household_id: string; now: string }> {
+    const res = await fetch(new URL("/demo/households", this.url), {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ household_id: householdId, start_at: startAt }),
+    });
+    const body = (await res.json()) as { household_id: string; now: string; error?: string };
+    if (!res.ok) throw Object.assign(new Error(body.error ?? `Seeding failed (${res.status})`), { status: res.status });
+    return body;
+  }
+
+  async householdExists(householdId: string): Promise<boolean> {
+    const res = await fetch(new URL(`/demo/households/${encodeURIComponent(householdId)}`, this.url));
+    return res.ok;
   }
 
   /** Call a tool for the backend itself (not the model), e.g. polling alerts or reading state for the UI. */

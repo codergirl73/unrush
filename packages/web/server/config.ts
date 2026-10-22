@@ -15,6 +15,19 @@ export interface Config {
   agentcoreMemoryId: string;
   /** UNRUSH_OFFLINE=1: scripted rehearsal model instead of Bedrock (clearly labelled in the UI). */
   offline: boolean;
+  /** WEB_HOST: interface to listen on (default 127.0.0.1; a deployment behind a proxy keeps that). */
+  host: string;
+  /**
+   * UNRUSH_PUBLIC=1: a hosted demo. Each browser gets its own household (cookie), seeded with a day that
+   * starts at 3pm, and Bedrock use is capped by the limits below.
+   */
+  publicDemo: boolean;
+  /** Chat turns one household may send per hour (public demo). */
+  turnsPerHour: number;
+  /** Bedrock-backed turns (chat + proactive) across everyone per UTC day (public demo). */
+  turnsPerDay: number;
+  /** New households one IP address may create per hour (public demo). */
+  householdsPerIpPerHour: number;
 }
 
 export function loadConfig(env = process.env): Config {
@@ -29,6 +42,11 @@ export function loadConfig(env = process.env): Config {
     alertPollMs: Number(env.ALERT_POLL_MS ?? 3000),
     agentcoreMemoryId: env.AGENTCORE_MEMORY_ID?.trim() ?? "",
     offline: env.UNRUSH_OFFLINE === "1",
+    host: env.WEB_HOST ?? "127.0.0.1",
+    publicDemo: env.UNRUSH_PUBLIC === "1",
+    turnsPerHour: Number(env.UNRUSH_TURNS_PER_HOUR ?? 40),
+    turnsPerDay: Number(env.UNRUSH_TURNS_PER_DAY ?? 1500),
+    householdsPerIpPerHour: Number(env.UNRUSH_HOUSEHOLDS_PER_IP_PER_HOUR ?? 10),
   };
 }
 
