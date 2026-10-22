@@ -22,7 +22,7 @@ Built for **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track + AWS
 2. **Unrush speaks first:** *"Your 5:30pm Project sync now runs to 7pm. To reach your 7:30pm Study group you'll need to leave by 7:05pm."*
 3. **The dinner swap.** Tonight's 45-minute chicken curry no longer fits; your longest free stretch is 40 minutes. Unrush offers a 15-minute tomato & garlic spaghetti made from what's in the pantry.
 4. **Groceries.** Eggs are out (you said so this morning). Milk will run out tomorrow, predicted from six weeks of purchases.
-5. **The order.** Unrush builds the order with **your usual products** from past orders, and **asks which one** for anything new ("Which pesto?"). It reads the order back and asks *"Shall I place the order?"* Nothing is bought without an explicit yes. On yes you get a **simulated** confirmation, plus a **real Amazon cart** with exactly those products, where you review and check out yourself.
+5. **The order.** Unrush builds the order with **your usual products** from past orders, and **asks which one** for anything new ("Which pesto?"). It reads the order back and asks *"Shall I place the order?"* Nothing is bought without an explicit yes. On yes you get a **simulated** confirmation, plus **a link to each product on Amazon**, where you add it to your cart and check out yourself.
 6. **Memory.** Reload the page, start a new session or restart the server, and Unrush still remembers everything, because the state lives in the MCP server's SQLite database.
 
 ## Architecture
@@ -197,7 +197,7 @@ The model is never hard-coded: set `BEDROCK_MODEL_ID` to a model or inference pr
 | Calendar events | **Simulated:** seeded demo data (`SimulatedCalendar`), labelled in the UI |
 | Travel times | **Simulated:** fixed estimates per place (`SimulatedTravel`) |
 | Grocery checkout, confirmation number, ETA | **Simulated:** Unrush never places a real order and no money moves. The UI labels it "Simulated checkout" |
-| Store products and Amazon cart | **Real:** Amazon's own grocery brands with real ASINs (`packages/mcp-server/src/domain/catalog.ts`). After "yes", **Review in Amazon cart** opens Amazon's documented add-to-cart link with exactly those products; Amazon shows its own confirmation and **you** check out. Prices shown are a snapshot estimate |
+| Store products and Amazon links | **Real:** Amazon's own grocery brands with real ASINs (`packages/mcp-server/src/domain/catalog.ts`). After "yes", each product links to its Amazon page (`amazon.com/dp/<ASIN>`, all 9 verified) where **you** add it to your cart and check out. Amazon's old bulk add-to-cart link redirected to an empty cart when tested signed in, so it isn't used. Prices shown are a snapshot estimate |
 | Six weeks of purchase history | **Simulated:** seeded so the prediction has data to learn from |
 | AgentCore Memory | **Real** when `AGENTCORE_MEMORY_ID` is set (your AWS account); otherwise in-process memory |
 | MCP Apps views | **Real** MCP Apps resources; the in-app host is a minimal reference host |

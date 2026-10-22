@@ -18,7 +18,7 @@ This page compares what the Alexa+ MCP Toolkit requires with what Unrush already
 | Round-trip latency **< 500 ms** | ✅ Tool calls take about 0.2–4 ms locally (logged per call) |
 | "Your MCP server must be accessible via a **remote URL**" (a tunnel such as cloudflared is fine during development) | ❌ Runs on `localhost` |
 | **OAuth 2.1** authorization code + **PKCE (S256)**, a Protected Resource Metadata document (RFC 9728), `/.well-known/oauth-authorization-server`, and `401` *without* `WWW-Authenticate` for unauthenticated requests | ❌ No auth (local demo). `household_id` would come from the linked account instead of a tool argument |
-| Checkout via **Amazon Wallet**: `POST /checkout-sessions` (create / get / update / complete / cancel) with idempotency keys. "Alexa+ handles voice PIN, payment instrument selection, and purchase confirmation" | ❌ Simulated checkout plus a real Amazon cart handoff. Alexa+ checkout would replace the simulated `place_order` |
+| Checkout via **Amazon Wallet**: `POST /checkout-sessions` (create / get / update / complete / cancel) with idempotency keys. "Alexa+ handles voice PIN, payment instrument selection, and purchase confirmation" | ❌ Simulated checkout plus real Amazon product links (the user adds to cart). Alexa+ checkout would replace the simulated `place_order` |
 | Add-on metadata (`addon.json`: name ≤ 30 chars, short description ≤ 123, 3–4 example phrases) and a privacy policy URL | ❌ Not created yet (drafts below) |
 
 **Not covered by these docs:** proactive notifications, where Alexa speaks first. Unrush's "speak first" moment is a web-backend feature (alert polling + Server-Sent Events). On Alexa+ it would depend on whatever proactive mechanism Amazon offers add-ons. Until then, the same alerts can be surfaced when the customer next talks to Alexa (`get_alerts`).
@@ -57,4 +57,4 @@ Classic Alexa custom skills can hand Alexa a product with `connection://AMAZON.A
 - Amazon requires the skill to be **certified and published** in each locale.
 - The docs were last updated in 2024.
 
-Until Alexa+ checkout is available, Unrush's real handoff is Amazon's documented add-to-cart link with the customer's usual products, which the customer confirms on Amazon ([Alexa Shopping Actions API reference](https://developer.amazon.com/en-US/docs/alexa/alexa-shopping/alexa-shopping-actions-for-alexa-skills-api-reference.html)).
+Until Alexa+ checkout is available, Unrush's real handoff is a link to each chosen product's Amazon page (the customer's usual products), where the customer adds it to their cart. Amazon's older bulk add-to-cart link (`/gp/aws/cart/add.html`) redirected to an empty cart when we tested it signed in ([Alexa Shopping Actions API reference](https://developer.amazon.com/en-US/docs/alexa/alexa-shopping/alexa-shopping-actions-for-alexa-skills-api-reference.html)).
