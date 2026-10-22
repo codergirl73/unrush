@@ -279,3 +279,11 @@ code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, 
 .view-toggle button.on { background: var(--brand); color: white; font-weight: 650; }
 .step.memory .step-dot { background: var(--brand-2); }
 .step.memory.fail { color: var(--bad); }
+
+/* ---------- store products ---------- */
+.order-item .product { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-2); margin-top: -2px; }
+.order-item .product .pill { font-size: 10.5px; padding: 2px 7px; }
+.order-item .choices .choice { border: 1px solid var(--brand); background: var(--brand-soft); color: var(--text); border-radius: 999px; padding: 4px 10px; font-size: 12px; }
+.order-item .choices .choice:hover:not(:disabled) { background: var(--brand); color: white; }
+.cart-link { display: inline-block; margin-top: 8px; padding: 8px 14px; border-radius: 10px; background: var(--brand); color: white; font-weight: 650; font-size: 13.5px; text-decoration: none; }
+.cart-link:hover { filter: brightness(1.1); }

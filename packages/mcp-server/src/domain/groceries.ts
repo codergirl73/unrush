@@ -11,6 +11,7 @@ import { compatible, humanize, round, toCanonical } from "../units.js";
 import { ensureHousehold, newId, today, validateHousehold, type Ctx } from "./ctx.js";
 import type { Meals } from "./meals.js";
 import type { Pantry } from "./pantry.js";
+import { amazonCartUrl, amazonSearchUrl, packsFor, productByAsin, productsFor, type Product } from "./catalog.js";
 
 export interface Prediction {
   item: string;
@@ -25,12 +26,33 @@ export interface Prediction {
   reasoning: string;
 }
 
+export interface ProductPick {
+  asin: string;
+  title: string;
+  packs: number;
+  price_usd: number;
+  /** usual = most-bought product in purchase history; chosen = picked in conversation; only = single catalog option. */
+  why: "usual" | "chosen" | "only";
+}
+
+export interface ProductChoice {
+  asin: string;
+  title: string;
+  price_usd: number;
+}
+
 export interface OrderItem {
   item: string;
   quantity: number | null;
   unit: string | null;
   section: Section;
   reasons: string[];
+  /** The store product that goes in the cart (null while the user still has to choose). */
+  product?: ProductPick | null;
+  /** Options to ask about when there is no purchase history for this item. */
+  choices?: ProductChoice[];
+  /** Store search link for items the product catalog doesn't cover. */
+  search_url?: string;
 }
 
 export interface OrderData {
@@ -206,10 +228,10 @@ export class Groceries {
       add(item, last?.quantity ?? 1, last?.unit ?? "count", "out of stock");
     }
 
-    const list: OrderItem[] = [...items.values()].map(({ canonical, ...rest }) => ({
-      ...rest,
-      ...(canonical.quantity === null ? { quantity: null, unit: null } : humanize(canonical.quantity, canonical.unit)),
-    }));
+    const list: OrderItem[] = [...items.values()].map(({ canonical, ...rest }) => {
+      const line: OrderItem = { ...rest, ...(canonical.quantity === null ? { quantity: null, unit: null } : humanize(canonical.quantity, canonical.unit)) };
+      return { ...line, ...this.pickProduct(householdId, line) };
+    });
     const data: OrderData = { days_ahead: daysAhead, items: list };
     const id = newId("ord");
     if (list.length > 0) {
@@ -218,6 +240,7 @@ export class Groceries {
         .run(id, householdId, JSON.stringify(data), this.ctx.clock.now());
       this.ctx.changed(householdId, "orders");
     }
+    const cart = cartSummary(list);
     return {
       household_id: householdId,
       order_id: list.length > 0 ? id : null,
@@ -226,11 +249,58 @@ export class Groceries {
       item_count: list.length,
       sections: groupBySection(list),
       read_back: readBack(list),
+      ...cart,
       note:
         list.length === 0
           ? "Nothing needed right now."
-          : "Simulated store. Read this order back to the user and ask 'Shall I place the order?'. Only call place_order with confirmed=true after an explicit yes.",
+          : cart.needs_choice.length > 0
+            ? "Before reading the order back, ask the user to choose a product for: " +
+              cart.needs_choice.map((n) => `${n.item} (${n.choices.map((c) => c.title).join(" / ")})`).join("; ") +
+              ". Then call choose_product. Only call place_order with confirmed=true after an explicit yes."
+            : "Read this order back (mention usual products briefly) and ask 'Shall I place the order?'. Only call place_order with confirmed=true after an explicit yes.",
     };
+  }
+
+  /** Product for an order line: the household's usual (most-bought) product, the only option, or choices to ask about. */
+  private pickProduct(householdId: string, line: OrderItem): Pick<OrderItem, "product" | "choices" | "search_url"> {
+    const options = productsFor(line.item);
+    if (options.length === 0) return { product: null, search_url: amazonSearchUrl(line.item) };
+    const usual = this.ctx.db
+      .prepare(
+        `SELECT product_id, COUNT(*) AS n FROM purchases WHERE household_id = ? AND item = ? AND product_id IS NOT NULL
+         GROUP BY product_id ORDER BY n DESC, MAX(purchased_at) DESC LIMIT 1`,
+      )
+      .get(householdId, line.item) as { product_id: string } | undefined;
+    const usualProduct = usual ? productByAsin(usual.product_id) : undefined;
+    if (usualProduct) return { product: pick(usualProduct, line, "usual") };
+    if (options.length === 1) return { product: pick(options[0]!, line, "only") };
+    return { product: null, choices: options.map((o) => ({ asin: o.asin, title: o.title, price_usd: o.price_usd })) };
+  }
+
+  /** Record the user's product choice on the latest draft order (or a given one). */
+  chooseProduct(householdId: string, item: string, asin: string, orderIdInput?: string) {
+    validateHousehold(householdId);
+    const product = productByAsin(asin);
+    const orderId =
+      orderIdInput ??
+      (this.ctx.db
+        .prepare("SELECT id FROM orders WHERE household_id = ? AND status = 'draft' ORDER BY created_at DESC, rowid DESC LIMIT 1")
+        .get(householdId) as { id: string } | undefined)?.id;
+    if (!orderId) throw new UnrushError("There is no draft order. Call build_grocery_order first.");
+    const row = this.getOrder(householdId, orderId);
+    if (row.status !== "draft") throw new UnrushError(`Order ${orderId} was already placed; build a new order to change products.`);
+    const data = JSON.parse(row.data) as OrderData;
+    const line = data.items.find((i) => i.item === item.trim().toLowerCase());
+    if (!line) throw new UnrushError(`"${item}" is not in order ${orderId}. Items: ${data.items.map((i) => i.item).join(", ")}.`);
+    if (!product || product.item !== line.item) {
+      const opts = productsFor(line.item).map((o) => `${o.asin} (${o.title})`).join(", ");
+      throw new UnrushError(`"${asin}" is not a product for ${line.item}. Options: ${opts || "none, use the search link"}.`);
+    }
+    line.product = pick(product, line, "chosen");
+    delete line.choices;
+    this.ctx.db.prepare("UPDATE orders SET data = ? WHERE id = ?").run(JSON.stringify(data), orderId);
+    this.ctx.changed(householdId, "orders");
+    return { household_id: householdId, ...orderView({ ...row, data: JSON.stringify(data) }) };
   }
 
   /** Median quantity of past purchases of an item in this unit, or null without history. */
@@ -280,6 +350,12 @@ export class Groceries {
       );
     }
     const data = JSON.parse(row.data) as OrderData;
+    const pending = data.items.filter((i) => !i.product && i.choices?.length);
+    if (pending.length > 0) {
+      throw new UnrushError(
+        `Order NOT placed: ask the user which product to buy for ${pending.map((i) => `${i.item} (${i.choices!.map((c) => c.title).join(" / ")})`).join("; ")}, then call choose_product.`,
+      );
+    }
     const now = this.ctx.clock.now();
     const confirmation = `SIM-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const eta = addMinutes(now, DELIVERY_MINUTES);
@@ -287,7 +363,7 @@ export class Groceries {
     this.ctx.db.transaction(() => {
       for (const it of data.items) {
         const q = it.quantity === null ? { quantity: 1, unit: "count" } : toCanonical(it.quantity, it.unit);
-        this.pantry.logPurchase(householdId, it.item, q, `order:${orderId}`, now);
+        this.pantry.logPurchase(householdId, it.item, q, `order:${orderId}`, now, it.product?.asin);
         const have = this.pantry.row(householdId, it.item);
         this.pantry.write(householdId, it.item, (have && compatible(have.unit, q.unit) ? have.quantity : 0) + q.quantity, q.unit);
       }
@@ -308,7 +384,10 @@ export class Groceries {
       eta_spoken: spokenTime(eta),
       item_count: data.items.length,
       sections: groupBySection(data.items),
-      note: "SIMULATED checkout: no real store, no payment and no card data. Items were added to the pantry and recorded as a purchase so future predictions learn.",
+      ...cartSummary(data.items),
+      note:
+        "Simulated order recorded (no payment, no card data); items were added to the pantry and purchase history so predictions and 'usual' products learn. " +
+        "To buy for real, the user opens cart_url: Amazon shows its own add-to-cart page and the user reviews and checks out there.",
     };
   }
 }
@@ -327,6 +406,21 @@ function orderView(row: OrderRow) {
     item_count: data.items.length,
     sections: groupBySection(data.items),
     read_back: readBack(data.items),
+    ...cartSummary(data.items),
+  };
+}
+
+function pick(product: Product, line: OrderItem, why: ProductPick["why"]): ProductPick {
+  return { asin: product.asin, title: product.title, packs: packsFor(product, line.quantity, line.unit), price_usd: product.price_usd, why };
+}
+
+/** Real Amazon cart link for the chosen products, items still to choose, and an estimated total. */
+function cartSummary(items: OrderItem[]) {
+  const picked = items.filter((i) => i.product);
+  return {
+    cart_url: amazonCartUrl(picked.map((i) => ({ asin: i.product!.asin, packs: i.product!.packs }))),
+    estimated_total_usd: Math.round(picked.reduce((s, i) => s + i.product!.price_usd * i.product!.packs, 0) * 100) / 100,
+    needs_choice: items.filter((i) => !i.product && i.choices?.length).map((i) => ({ item: i.item, choices: i.choices! })),
   };
 }
 

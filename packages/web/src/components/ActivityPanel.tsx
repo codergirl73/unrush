@@ -18,7 +18,7 @@ export interface ActivityTurn {
   usage?: { inputTokens: number; outputTokens: number; modelCalls: number; toolCalls: number; ms: number };
 }
 
-const WRITE_TOOLS = new Set(["update_pantry", "set_preferences", "save_meal_plan", "mark_meal_cooked", "add_or_update_event", "build_grocery_order", "place_order"]);
+const WRITE_TOOLS = new Set(["update_pantry", "set_preferences", "save_meal_plan", "mark_meal_cooked", "add_or_update_event", "build_grocery_order", "choose_product", "place_order"]);
 
 export function ActivityPanel({ turns, offline }: { turns: ActivityTurn[]; offline: boolean }) {
   const end = useRef<HTMLDivElement>(null);
@@ -180,11 +180,13 @@ function summarizeResult(name: string, r: { ok: boolean; data: Record<string, un
     case "predict_runouts":
       return (d.predictions ?? []).map((p: { item: string; status: string; predicted_runout_date: string }) => `${p.item}: ${p.status === "out" ? "out" : p.predicted_runout_date}`).join(" · ") || "nothing running low";
     case "build_grocery_order":
-      return `draft · ${d.item_count} items (simulated store)`;
+      return `draft · ${d.item_count} items · ${d.needs_choice?.length ? `ask about ${d.needs_choice.map((n: { item: string }) => n.item).join(", ")}` : "usual products"} · ~$${d.estimated_total_usd}`;
+    case "choose_product":
+      return `${d.needs_choice?.length ? "more to choose" : "all products chosen"} · ~$${d.estimated_total_usd}`;
     case "get_order":
       return d.order ? `${d.order.status} · ${d.order.item_count} items` : "no orders";
     case "place_order":
-      return `placed · ${d.confirmation_number} (simulated)`;
+      return `placed · ${d.confirmation_number} (simulated) · Amazon cart ready`;
     case "get_alerts":
       return `${d.count} alert(s)`;
     default:

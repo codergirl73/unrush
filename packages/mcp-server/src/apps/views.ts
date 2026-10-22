@@ -76,7 +76,7 @@ app.ontoolresult = async (p) => {
 export function orderViewHtml(): string {
   return page(
     "Unrush grocery order",
-    `<h1>Grocery order <span class="sim">Simulated store</span></h1><div id="items" class="empty">Waiting for the order…</div><div id="action"></div>`,
+    `<h1>Grocery order <span class="sim">Simulated checkout</span></h1><div id="items" class="empty">Waiting for the order…</div><div id="action"></div>`,
     `
 app.ontoolresult = (p) => {
   const s = p.structuredContent ?? {};
@@ -84,13 +84,22 @@ app.ontoolresult = (p) => {
   if (!o || !o.sections) { document.getElementById("items").innerHTML = '<span class="empty">No order yet.</span>'; return; }
   document.getElementById("items").innerHTML = o.sections.map((sec) => '<div class="sec">' + esc(sec.section) + "</div>" +
     sec.items.map((i) => '<div class="row"><span class="q">' + (i.quantity == null ? "" : i.unit === "count" ? "× " + i.quantity : i.quantity + " " + esc(i.unit)) +
-      "</span><span><b>" + esc(i.item) + '</b> <span class="muted">' + esc(i.reasons.join(" · ")) + "</span></span></div>").join("")).join("");
+      "</span><span><b>" + esc(i.item) + '</b> <span class="muted">' + esc(i.reasons.join(" · ")) + "</span>" +
+      (i.product ? '<br><span class="muted">' + esc(i.product.title) + " · $" + Number(i.product.price_usd).toFixed(2) + (i.product.why === "usual" ? " · your usual" : "") + "</span>"
+        : i.choices ? '<br><span class="muted">Which one? ' + esc(i.choices.map((c) => c.title).join(" / ")) + "</span>" : "") +
+      "</span></div>").join("")).join("");
   const action = document.getElementById("action");
   if (o.status === "placed") {
     action.innerHTML = '<div class="done">Order placed · ' + esc(o.confirmation_number) + (o.eta_spoken ? " · arriving around " + esc(o.eta_spoken) : "") +
-      '<div class="muted">Simulated confirmation: no real store, no charge, no card data.</div></div>';
+      '<div class="muted">Simulated order recorded: no charge, no card data. Your Amazon cart is ready to review.</div></div>' +
+      (o.cart_url ? '<button id="cart">Review in Amazon cart ↗</button>' : "");
+    const cart = document.getElementById("cart");
+    if (cart) cart.onclick = () => app.openLink({ url: o.cart_url });
   } else {
-    action.innerHTML = '<button id="yes">Yes, place the order (simulated checkout)</button><div class="muted">Nothing is bought until you say yes. No payment details are used.</div>';
+    const pending = (o.needs_choice || []).length;
+    action.innerHTML = '<button id="yes"' + (pending ? " disabled" : "") + '>Yes, place the order</button><div class="muted">' +
+      (pending ? "Choose a product first (ask Unrush). " : "About $" + Number(o.estimated_total_usd || 0).toFixed(2) + " at Amazon. ") +
+      "Nothing is bought until you say yes. Unrush never pays.</div>";
     document.getElementById("yes").onclick = async (ev) => {
       ev.target.disabled = true;
       await app.sendMessage({ role: "user", content: [{ type: "text", text: "Yes, place the order." }] });

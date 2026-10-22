@@ -74,9 +74,9 @@ const toolUse = (toolUseId: string, name: string, input: Record<string, unknown>
 const toolResults = (m: Message) => m.content!.map((b) => b.toolResult!);
 
 describe("MCP → Bedrock tool conversion", () => {
-  it("negotiates MCP 2025-11-25 and exposes all 16 tools", () => {
+  it("negotiates MCP 2025-11-25 and exposes all 17 tools", () => {
     expect(bridge.protocolVersion).toBe("2025-11-25");
-    expect(bridge.toolConfig().tools).toHaveLength(16);
+    expect(bridge.toolConfig().tools).toHaveLength(17);
   });
 
   it("hides household_id from the model and drops $schema", () => {
@@ -150,6 +150,9 @@ describe("runAgent", () => {
 
   it("places the order once the user said yes to the order question", async () => {
     const order = await bridge.read("build_grocery_order");
+    for (const n of order.needs_choice as Array<{ item: string; choices: Array<{ asin: string }> }>) {
+      await bridge.read("choose_product", { item: n.item, asin: n.choices[0]!.asin });
+    }
     const { client } = fakeBedrock([
       { stopReason: "tool_use", content: [toolUse("p2", "place_order", { order_id: order.order_id, confirmed: true })] },
       { stopReason: "end_turn", content: [{ text: "Ordered! Simulated confirmation is on screen." }] },
@@ -232,5 +235,18 @@ describe("speakable replies", () => {
     expect(stripThinking("Use the *quick* one, `SIM-1` placed.")).toBe("Use the quick one, SIM-1 placed.");
     expect(stripThinking("- 12 eggs\n- 2 l milk")).toBe("12 eggs\n2 l milk");
     expect(stripThinking("5 * 3 = 15 and 2*4")).toBe("5 * 3 = 15 and 2*4");
+  });
+});
+
+describe("facts carried between turns", () => {
+  it("keeps ids the next turn needs, which spoken replies drop", async () => {
+    const { factsFrom } = await import("../server/app.js");
+    expect(factsFrom("suggest_quick_meal", { suggestions: [{ recipe_id: "tomato-garlic-spaghetti", name: "Tomato & garlic spaghetti", prep_minutes: 15 }] })).toEqual([
+      'offered recipe "Tomato & garlic spaghetti" (recipe_id tomato-garlic-spaghetti, 15 min)',
+    ]);
+    const [f] = factsFrom("build_grocery_order", { needs_choice: [{ item: "pesto", choices: [{ asin: "B0CS56H5HL", title: "Amazon Grocery Basil Pesto, 8 oz" }] }] });
+    expect(f).toMatch(/needs a product choice for pesto \(Amazon Grocery Basil Pesto, 8 oz = asin B0CS56H5HL\)/);
+    expect(factsFrom("build_grocery_order", { needs_choice: [], read_back: "12 eggs" })).toEqual(["draft order complete and read back: 12 eggs"]);
+    expect(factsFrom("get_pantry", {})).toEqual([]);
   });
 });

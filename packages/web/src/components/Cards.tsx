@@ -138,9 +138,16 @@ export function DinnerCard({ tonight, alerts, flash }: { tonight: PlanDay | null
 
 // ---------- grocery order ----------
 
-export function OrderCard({ order, onConfirm, busy, flash }: { order: Order | null; onConfirm: () => void; busy: boolean; flash?: boolean }) {
+export function OrderCard({ order, onConfirm, onChoose, busy, flash }: {
+  order: Order | null;
+  onConfirm: () => void;
+  onChoose: (item: string, title: string) => void;
+  busy: boolean;
+  flash?: boolean;
+}) {
+  const pending = order?.needs_choice?.length ?? 0;
   return (
-    <Card title="Grocery order" icon={<CartIcon />} badge={<Sim label="Simulated store" />} className="order-card" flash={flash}>
+    <Card title="Grocery order" icon={<CartIcon />} badge={<Sim label="Simulated checkout" />} className="order-card" flash={flash}>
       {!order && <div className="empty">No order yet. Ask “what do we need from the store?”</div>}
       {order && (
         <>
@@ -152,15 +159,35 @@ export function OrderCard({ order, onConfirm, busy, flash }: { order: Order | nu
                   <span className="qty">{i.quantity === null ? "" : i.unit === "count" ? `× ${i.quantity}` : `${i.quantity} ${i.unit}`}</span>
                   <span className="item">{i.item}</span>
                   <span className="reasons">{i.reasons.join(" · ")}</span>
+                  {i.product && (
+                    <span className="product">
+                      {i.product.packs > 1 ? `${i.product.packs} × ` : ""}
+                      {i.product.title} · ${i.product.price_usd.toFixed(2)}
+                      <span className={`pill ${i.product.why === "usual" ? "ok" : ""}`}>{i.product.why === "usual" ? "your usual" : i.product.why === "chosen" ? "you chose" : "only option"}</span>
+                    </span>
+                  )}
+                  {!i.product && i.choices && (
+                    <span className="product choices">
+                      <span className="pill warn">Which one?</span>
+                      {i.choices.map((c) => (
+                        <button key={c.asin} className="choice" disabled={busy} onClick={() => onChoose(i.item, c.title)}>
+                          {c.title} · ${c.price_usd.toFixed(2)}
+                        </button>
+                      ))}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
           ))}
           {order.status === "draft" ? (
             <div className="checkout">
-              <div className="muted">Nothing is bought until you say yes. No payment details are used.</div>
-              <button className="primary-btn" onClick={onConfirm} disabled={busy}>
-                <CartIcon width={16} height={16} /> Yes, place order · Simulated checkout
+              <div className="muted">
+                {pending ? `Choose ${pending === 1 ? "a product" : `${pending} products`} first. ` : `About $${order.estimated_total_usd.toFixed(2)} at Amazon. `}
+                Nothing is bought until you say yes. Unrush never pays.
+              </div>
+              <button className="primary-btn" onClick={onConfirm} disabled={busy || pending > 0}>
+                <CartIcon width={16} height={16} /> Yes, place order
               </button>
             </div>
           ) : (
@@ -168,7 +195,12 @@ export function OrderCard({ order, onConfirm, busy, flash }: { order: Order | nu
               <CheckIcon />
               <div>
                 <div className="confirm-num">Order placed · {order.confirmation_number}</div>
-                <div className="muted">Simulated confirmation: no real store, no charge, no card data. Items added to the pantry.</div>
+                <div className="muted">Simulated order recorded: no charge, no card data. Your real Amazon cart is ready to review and check out yourself.</div>
+                {order.cart_url && (
+                  <a className="cart-link" href={order.cart_url} target="_blank" rel="noopener noreferrer">
+                    Review in Amazon cart ↗
+                  </a>
+                )}
               </div>
             </div>
           )}

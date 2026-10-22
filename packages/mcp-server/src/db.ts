@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS purchases (
   quantity     REAL NOT NULL,
   unit         TEXT NOT NULL,
   purchased_at TEXT NOT NULL,
-  source       TEXT NOT NULL
+  source       TEXT NOT NULL,
+  product_id   TEXT            -- store product (ASIN) when known; drives "your usual"
 );
 CREATE INDEX IF NOT EXISTS idx_purchases_item ON purchases(household_id, item);
 
@@ -123,5 +124,8 @@ export function openDb(path: string): DB {
   db.pragma("foreign_keys = ON");
   db.pragma("busy_timeout = 3000");
   db.exec(SCHEMA);
+  // Migration for databases created before product_id existed.
+  const cols = db.prepare("PRAGMA table_info(purchases)").all() as Array<{ name: string }>;
+  if (!cols.some((c) => c.name === "product_id")) db.exec("ALTER TABLE purchases ADD COLUMN product_id TEXT");
   return db;
 }

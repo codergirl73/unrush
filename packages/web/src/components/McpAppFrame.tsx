@@ -44,7 +44,7 @@ export function McpAppFrame({ uri, toolName, result, theme, onMessage }: Props) 
   const connect = () => {
     const win = frame.current?.contentWindow;
     if (!html || !win || bridge.current) return;
-    const b = new AppBridge(null, { name: "Unrush web host", version: "0.1.0" }, { serverTools: {}, logging: {} }, { hostContext: { theme } });
+    const b = new AppBridge(null, { name: "Unrush web host", version: "0.1.0" }, { serverTools: {}, logging: {}, openLinks: {} }, { hostContext: { theme } });
     b.oncalltool = async (params) => {
       const res = await fetch("/api/apps/call", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(params) });
       return (await res.json()) as CallToolResult;
@@ -52,6 +52,12 @@ export function McpAppFrame({ uri, toolName, result, theme, onMessage }: Props) 
     b.onmessage = async (params) => {
       const text = params.content.map((c) => (c.type === "text" ? c.text : "")).join(" ").trim();
       if (text) onMessageRef.current(text);
+      return {};
+    };
+    // Views may only open Amazon cart/search links (the real cart handoff), in a new tab.
+    b.onopenlink = async ({ url }) => {
+      if (!/^https:\/\/www\.amazon\.com\//.test(url)) return { isError: true };
+      window.open(url, "_blank", "noopener,noreferrer");
       return {};
     };
     b.onsizechange = ({ height: h }) => {

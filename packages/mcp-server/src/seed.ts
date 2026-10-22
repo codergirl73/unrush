@@ -46,14 +46,18 @@ const PANTRY: Array<[string, number, string?]> = [
   ["tortilla", 6],
 ];
 
-/** Purchase history: [item, quantity, unit, days-ago list]. Milk ~every 4 days, eggs weekly, bread every ~6 days… */
-const HISTORY: Array<[string, number, string | undefined, number[]]> = [
-  ["whole milk", 2, "l", [42, 38, 35, 31, 27, 23, 19, 15, 11, 6, 2]],
-  ["egg", 12, undefined, [42, 35, 28, 21, 14, 7]],
+/**
+ * Purchase history: [item, quantity, unit, days-ago list, store product (ASIN) usually bought].
+ * Milk ~every 4 days, eggs weekly, bread every ~6 days… Products give "your usual" in orders;
+ * pesto has no history, so Unrush asks which one to buy.
+ */
+const HISTORY: Array<[string, number, string | undefined, number[], string?]> = [
+  ["whole milk", 2, "l", [42, 38, 35, 31, 27, 23, 19, 15, 11, 6, 2], "B07YSWG9WS"],
+  ["egg", 12, undefined, [42, 35, 28, 21, 14, 7], "B07GBM7TZJ"],
   ["bread", 20, "slice", [42, 36, 30, 24, 18, 12, 6]],
   ["cheddar cheese", 200, "g", [42, 35, 28, 21, 14, 7]],
   ["spaghetti", 500, "g", [40, 30, 20, 10]],
-  ["baby spinach", 200, "g", [40, 33, 26, 19, 12, 5]],
+  ["baby spinach", 200, "g", [40, 33, 26, 19, 12, 5], "B074H4WRNG"],
   ["basmati rice", 2, "kg", [40, 12]],
   ["chicken thigh", 600, "g", [3]],
 ];
@@ -115,9 +119,9 @@ export function seedDemo(db: DB, householdId = DEMO_HOUSEHOLD, opts: UnrushOptio
       app.pantry.write(householdId, normalizeItemName(item), c.quantity, c.unit);
     }
 
-    for (const [item, quantity, unit, daysAgo] of HISTORY) {
+    for (const [item, quantity, unit, daysAgo, asin] of HISTORY) {
       const c = toCanonical(quantity, unit);
-      for (const d of daysAgo) app.pantry.logPurchase(householdId, normalizeItemName(item), c, "seed history", at(addDays(today, -d), "18:00"));
+      for (const d of daysAgo) app.pantry.logPurchase(householdId, normalizeItemName(item), c, "seed history", at(addDays(today, -d), "18:00"), asin);
     }
     app.pantry.logConsumption(householdId, "egg", null, "ran out", at(today, "08:10"));
 

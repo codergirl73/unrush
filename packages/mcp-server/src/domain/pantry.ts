@@ -56,10 +56,10 @@ export class Pantry {
       .run(householdId, item, round(quantity), unit, this.ctx.clock.now());
   }
 
-  logPurchase(householdId: string, item: string, q: Qty, source: string, at = this.ctx.clock.now()) {
+  logPurchase(householdId: string, item: string, q: Qty, source: string, at = this.ctx.clock.now(), productId?: string) {
     this.ctx.db
-      .prepare("INSERT INTO purchases (household_id, item, quantity, unit, purchased_at, source) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(householdId, item, q.quantity, q.unit, at, source);
+      .prepare("INSERT INTO purchases (household_id, item, quantity, unit, purchased_at, source, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(householdId, item, q.quantity, q.unit, at, source, productId ?? null);
   }
 
   logConsumption(householdId: string, item: string, q: Qty | null, reason: string, at = this.ctx.clock.now()) {

@@ -24,7 +24,7 @@ export function proactiveInstruction(alerts: AlertLike[]): string {
     "Speak first: the user has not said anything. In two or three short sentences:",
     alerts.some((a) => a.kind === "leave_by") ? "1. Say what changed and exactly when they need to leave." : "",
     meal
-      ? `2. Tonight's dinner no longer fits: call suggest_quick_meal with max_minutes ${Number(meal.data.suggested_max_minutes ?? 15)}, and offer the top suggestion by name and time.`
+      ? `2. Tonight's dinner no longer fits: call suggest_quick_meal with max_minutes ${Number(meal.data.suggested_max_minutes ?? 15)}, and offer the top suggestion using its exact name and prep time from the tool result.`
       : "",
     runoutOnly ? "Mention what is out or running low and offer to put a grocery order together." : "",
     "End with ONE yes/no question. Do not change the plan, and do not build or place any order yet.",

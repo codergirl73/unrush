@@ -88,10 +88,12 @@ describe("place_order", () => {
   it("with confirmed=true returns a simulated confirmation, stocks the pantry and teaches the predictor", () => {
     const { app } = seeded();
     const o = app.groceries.buildOrder(H);
+    app.groceries.chooseProduct(H, "pesto", "B0CS56H5HL");
     const r = app.groceries.placeOrder(H, o.order_id!, true);
     expect(r).toMatchObject({ status: "placed", simulated: true, eta: `${TODAY}T17:00`, eta_spoken: "5pm" });
     expect(r.confirmation_number).toMatch(/^SIM-[A-Z0-9]{6}$/);
-    expect(r.note).toMatch(/SIMULATED.*no card data/);
+    expect(r.note).toMatch(/Simulated order recorded \(no payment, no card data\)/);
+    expect(r.cart_url).toContain("amazon.com/gp/aws/cart/add.html");
     expect(app.pantry.row(H, "egg")).toEqual({ quantity: 12, unit: "count" });
     expect(app.pantry.row(H, "whole milk")).toEqual({ quantity: 2600, unit: "ml" });
     expect(app.groceries.predictRunouts(H, 2).predictions).toEqual([]);
@@ -127,8 +129,71 @@ describe("order realism and robustness", () => {
   it("place_order without an order_id places the latest draft (still only with confirmed=true)", () => {
     const { app } = seeded();
     const o = app.groceries.buildOrder(H);
+    app.groceries.chooseProduct(H, "pesto", "B0CS56H5HL");
     expect(() => app.groceries.placeOrder(H, undefined, false)).toThrow(/NOT placed/);
     expect(app.groceries.placeOrder(H, undefined, true)).toMatchObject({ order_id: o.order_id, status: "placed" });
     expect(() => app.groceries.placeOrder(H, undefined, true)).toThrow(/no draft order/);
+  });
+});
+
+describe("store products: your usual, choices and a real Amazon cart", () => {
+  it("picks the usual product from purchase history and asks about items without history", () => {
+    const { app } = seeded();
+    const o = app.groceries.buildOrder(H);
+    const items = o.sections.flatMap((s) => s.items);
+    expect(items.find((i) => i.item === "whole milk")!.product).toMatchObject({ asin: "B07YSWG9WS", why: "usual", packs: 1 });
+    expect(items.find((i) => i.item === "egg")!.product).toMatchObject({ asin: "B07GBM7TZJ", why: "usual", packs: 1 });
+    const pesto = items.find((i) => i.item === "pesto")!;
+    expect(pesto.product).toBeNull();
+    expect(pesto.choices!.map((c) => c.asin)).toEqual(["B0CS56H5HL", "B085DTX3K8", "B08KT6N4SH"]);
+    expect(o.needs_choice.map((n) => n.item)).toEqual(["pesto"]);
+    expect(o.note).toMatch(/ask the user to choose a product for: pesto/);
+  });
+
+  it("builds Amazon's add-to-cart link from chosen products, with an estimated total", () => {
+    const { app } = seeded();
+    app.groceries.buildOrder(H);
+    const r = app.groceries.chooseProduct(H, "pesto", "B0CS56H5HL");
+    expect(r.needs_choice).toEqual([]);
+    expect(r.cart_url).toMatch(/^https:\/\/www\.amazon\.com\/gp\/aws\/cart\/add\.html\?ASIN\.1=/);
+    for (const asin of ["B07YSWG9WS", "B07GBM7TZJ", "B0CS56H5HL"]) expect(r.cart_url).toContain(asin);
+    expect(r.cart_url).toMatch(/Quantity\.1=1/);
+    expect(r.estimated_total_usd).toBeGreaterThan(8);
+  });
+
+  it("refuses to place an order while a product choice is pending", () => {
+    const { app } = seeded();
+    app.groceries.buildOrder(H);
+    expect(() => app.groceries.placeOrder(H, undefined, true)).toThrow(/ask the user which product to buy for pesto/);
+  });
+
+  it("validates choices and learns them: a placed choice becomes the usual next time", () => {
+    const { app } = seeded();
+    app.groceries.buildOrder(H);
+    expect(() => app.groceries.chooseProduct(H, "pesto", "B07YSWG9WS")).toThrow(/not a product for pesto/);
+    expect(() => app.groceries.chooseProduct(H, "caviar", "B0CS56H5HL")).toThrow(/not in order/);
+    app.groceries.chooseProduct(H, "pesto", "B085DTX3K8");
+    const placed = app.groceries.placeOrder(H, undefined, true);
+    expect(placed.cart_url).toContain("B085DTX3K8");
+    app.pantry.update(H, [{ item: "pesto", action: "remove" }]);
+    const next = app.groceries.buildOrder(H).sections.flatMap((s) => s.items).find((i) => i.item === "pesto")!;
+    expect(next.product).toMatchObject({ asin: "B085DTX3K8", why: "usual" });
+  });
+
+  it("adds the product_id column to databases created before it existed", async () => {
+    const { mkdtempSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const Database = (await import("better-sqlite3")).default;
+    const { openDb } = await import("../src/db.js");
+    const dir = mkdtempSync(join(tmpdir(), "unrush-mig-"));
+    const legacy = new Database(join(dir, "old.db"));
+    legacy.exec("CREATE TABLE purchases (id INTEGER PRIMARY KEY, household_id TEXT, item TEXT, quantity REAL, unit TEXT, purchased_at TEXT, source TEXT)");
+    legacy.close();
+    const db = openDb(join(dir, "old.db"));
+    const cols = (db.prepare("PRAGMA table_info(purchases)").all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols).toContain("product_id");
+    db.close();
+    rmSync(dir, { recursive: true, force: true });
   });
 });

@@ -244,7 +244,7 @@ export function App() {
               <TimelineCard state={state} flash={!!flash.timeline} key={`t${flash.timeline ?? 0}`} />
               <div className="card-row">
                 <DinnerCard tonight={state.tonight} alerts={state.alerts} flash={!!flash.dinner} key={`d${flash.dinner ?? 0}`} />
-                <OrderCard order={state.order} busy={busy} onConfirm={() => send("Yes, place the order.")} flash={!!flash.order} key={`o${flash.order ?? 0}`} />
+                <OrderCard order={state.order} busy={busy} onConfirm={() => send("Yes, place the order.")} onChoose={(item, title) => send(`For ${item}, I'll take the ${title}.`)} flash={!!flash.order} key={`o${flash.order ?? 0}`} />
               </div>
               <div className="card-row">
                 <RunoutCard predictions={state.runouts.predictions} today={state.runouts.today} flash={!!flash.runout} key={`r${flash.runout ?? 0}`} />

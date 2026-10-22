@@ -93,7 +93,7 @@ export async function runAgent(opts: RunAgentOptions): Promise<AgentResult> {
         system: [{ text: opts.system }],
         messages,
         toolConfig,
-        inferenceConfig: { maxTokens: opts.maxTokens ?? 2048, temperature: opts.temperature ?? 0.3 },
+        inferenceConfig: { maxTokens: opts.maxTokens ?? 2048, temperature: opts.temperature ?? 0.1 },
       }),
     );
     inputTokens += res.usage?.inputTokens ?? 0;

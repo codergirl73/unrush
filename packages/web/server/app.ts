@@ -71,7 +71,8 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
   async function systemNow(proactive = false, extra: string[] = []) {
     const now = await bridge.now();
     today = now.slice(0, 10);
-    return systemPrompt(now, [skillsCatalog(skills), proactive && rescue ? activeSkillBlock(rescue) : "", ...extra]);
+    // The evening-rescue playbook is always active (saves a load_skill step); other skills load on demand.
+    return systemPrompt(now, [skillsCatalog(skills.filter((s) => s !== rescue)), rescue ? activeSkillBlock(rescue) : "", ...extra]);
   }
 
   /** Run an AgentCore Memory call best-effort, reporting it as a "memory" event. */
@@ -108,6 +109,8 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
       log(`[proactive] ${alerts.map((a) => a.kind).join(", ")}`);
       publish({ type: "proactive_start", runId, alerts });
       const instruction = proactiveInstruction(alerts);
+      /** Tool facts the next turn needs (e.g. the suggested recipe_id), since history keeps only spoken text. */
+      const facts: string[] = [];
       let reply: string;
       let fallback = false;
       let error: string | undefined;
@@ -121,7 +124,10 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
           userText: instruction,
           maxTokens: config.maxTokens,
           allowPlaceOrder: false,
-          onEvent: (event) => publish({ type: "agent", runId, source: "proactive", event }),
+          onEvent: (event) => {
+            publish({ type: "agent", runId, source: "proactive", event });
+            if (event.type === "tool_result" && event.ok) facts.push(...factsFrom(event.name, event.data));
+          },
         });
         reply = r.reply;
       } catch (err) {
@@ -131,7 +137,10 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
         fallback = true;
         log(`[proactive] model failed, spoke alert text instead: ${error}`);
       }
-      const turn = { user: "(Unrush spoke first about: " + alerts.map((a) => a.message).join(" ") + ")", assistant: reply };
+      const turn = {
+        user: "(Unrush spoke first about: " + alerts.map((a) => a.message).join(" ") + (facts.length ? ` Facts: ${facts.join("; ")}.` : "") + ")",
+        assistant: reply,
+      };
       memory.broadcast(turn);
       await remember("save", (m) => m.saveTurn(today, turn), () => "proactive turn saved", (event) => publish({ type: "agent", runId, source: "proactive", event }));
       publish({ type: "proactive_end", runId, reply, fallback, error });
@@ -184,6 +193,7 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
         const turns = await remember("load", (m) => m.loadTurns(today, config.historyTurns), (t) => `${t.length} earlier turn(s) from today`, send);
         if (turns?.length) memory.seed(sessionId, turns);
       }
+      const chatFacts: string[] = [];
       const recalled = await remember("recall", (m) => m.recall(userText), (r) => (r.length ? `${r.length} household preference(s)` : "nothing relevant"), send);
       const r = await runAgent({
         client,
@@ -196,10 +206,11 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
         allowPlaceOrder: allowsOrder(memory.lastAssistant(sessionId), userText),
         onEvent: (event) => {
           send(event);
+          if (event.type === "tool_result" && event.ok) chatFacts.push(...factsFrom(event.name, event.data));
           if (event.type === "tool_call" || event.type === "tool_result") publish({ type: "agent", runId, source: "chat", event });
         },
       });
-      const turn = { user: userText, assistant: r.reply };
+      const turn = { user: chatFacts.length ? `${userText} (Facts: ${chatFacts.join("; ")}.)` : userText, assistant: r.reply };
       memory.add(sessionId, turn);
       await remember("save", (m) => m.saveTurn(today, turn), () => "turn saved", send);
       publish({ type: "state_changed" });
@@ -270,4 +281,23 @@ export function createApp({ config, bridge, model, skills = loadSkills(), longTe
   });
 
   return { app, pollAlerts, publish, memory };
+}
+
+/** Compact facts from tool results that a follow-up turn needs but spoken text drops. */
+export function factsFrom(tool: string, data: Record<string, unknown>): string[] {
+  if (tool === "suggest_quick_meal") {
+    const top = (data.suggestions as Array<{ recipe_id: string; name: string; prep_minutes: number }> | undefined)?.[0];
+    return top ? [`offered recipe "${top.name}" (recipe_id ${top.recipe_id}, ${top.prep_minutes} min)`] : [];
+  }
+  if (tool === "compute_leave_by" && typeof data.leave_by_spoken === "string") return [`leave by ${data.leave_by_spoken}`];
+  if (tool === "save_meal_plan") return ["tonight's dinner swap saved"];
+  if (tool === "build_grocery_order" || tool === "choose_product") {
+    const pending = (data.needs_choice as Array<{ item: string; choices: Array<{ asin: string; title: string }> }> | undefined) ?? [];
+    return [
+      pending.length
+        ? `draft order saved; still needs a product choice for ${pending.map((n) => `${n.item} (${n.choices.map((c) => `${c.title} = asin ${c.asin}`).join(" / ")})`).join("; ")}`
+        : `draft order complete and read back: ${String(data.read_back ?? "")}`,
+    ];
+  }
+  return [];
 }

@@ -80,12 +80,21 @@ export interface Prediction {
   reasoning: string;
 }
 
+export interface ProductChoice {
+  asin: string;
+  title: string;
+  price_usd: number;
+}
+
 export interface OrderItem {
   item: string;
   quantity: number | null;
   unit: string | null;
   section: string;
   reasons: string[];
+  product?: (ProductChoice & { packs: number; why: "usual" | "chosen" | "only" }) | null;
+  choices?: ProductChoice[];
+  search_url?: string;
 }
 
 export interface Order {
@@ -98,6 +107,9 @@ export interface Order {
   item_count: number;
   sections: Array<{ section: string; items: OrderItem[] }>;
   read_back: string;
+  cart_url: string | null;
+  estimated_total_usd: number;
+  needs_choice: Array<{ item: string; choices: ProductChoice[] }>;
 }
 
 export interface AppState {

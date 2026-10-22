@@ -70,7 +70,7 @@ export function skillsCatalog(skills: Skill[]): string {
   if (!skills.length) return "";
   return [
     "SKILLS",
-    "You have these skills. When a request matches one, call load_skill with its name first and follow it.",
+    "Other skills you can load with load_skill when a request matches:",
     ...skills.map((s) => `- ${s.name}: ${s.description}`),
   ].join("\n");
 }

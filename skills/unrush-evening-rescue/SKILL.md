@@ -29,13 +29,14 @@ Use this playbook when the evening plan breaks, for example when a meeting runs 
 
 Do this in the same turn as the dinner swap:
 
-1. Call `predict_runouts` with `days_ahead: 2` to find what is out or running low. Mention at most two items, with the reason ("milk runs out tomorrow").
-2. Call `build_grocery_order`. Read `read_back` in one sentence, then ask exactly: "Shall I place the order?"
+1. Call `build_grocery_order`. It already includes what's out and what's predicted to run out (see each item's reasons), using the household's usual store products. Mention at most two items with the reason ("milk runs out tomorrow").
+2. If `needs_choice` lists items (no purchase history), ask which product they want, with short names and prices, in one question. On their answer, call `choose_product` with the matching `asin`.
+3. Read `read_back` in one sentence, then ask exactly: "Shall I place the order?"
 
 ## 4. Place the order only on an explicit yes
 
 - Call `place_order` with `confirmed: true` **only** if the person's latest message is a clear yes to "Shall I place the order?". See [references/consent.md](references/consent.md).
-- Then say the simulated confirmation number and ETA, and say that checkout is simulated.
+- Then say the simulated confirmation number and ETA, and that their Amazon cart is ready to review on screen. Unrush never pays: the person reviews and checks out on Amazon themselves.
 - If they hesitate or say anything other than yes, do not order. Offer to change the list instead.
 
 ## Don'ts

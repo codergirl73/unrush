@@ -144,25 +144,32 @@ describe("proactive wiring", () => {
     // Alerts were claimed: polling again says nothing.
     expect(await app.pollAlerts()).toBeNull();
 
-    // "Yes" to the swap → plan saved, run-outs predicted, order drafted and read back.
+    // "Yes" to the swap → plan saved, run-outs predicted, order drafted with usual products;
+    // pesto has no purchase history, so Unrush asks which one.
     const swap = await chat("Yes please");
     expect(swap.tools).toEqual(["save_meal_plan", "predict_runouts", "build_grocery_order"]);
     expect(swap.reply).toMatch(/eggs are out and whole milk runs out tomorrow/);
-    expect(swap.reply).toMatch(/12 eggs, 2 l whole milk and 100 g pesto\. Shall I place the order\?$/);
+    expect(swap.reply).toMatch(/your usual products\. Which pesto would you like: Amazon Grocery Basil Pesto, 8 oz for \$3\.5/);
+
+    // The user picks one → choose_product, read-back, and the order question.
+    const pick = await chat("The first one");
+    expect(pick.tools).toEqual(["get_order", "choose_product"]);
+    expect(pick.reply).toMatch(/12 eggs, 2 l whole milk and 100 g pesto, about \$\d+(\.\d+)?\. Shall I place the order\?$/);
 
     // Explicit "yes" to the order question → simulated checkout.
     const placed = await chat("Yes, go ahead");
     expect(placed.tools).toEqual(["get_order", "place_order"]);
     const result = placed.events.find((e) => e.type === "tool_result" && e.name === "place_order");
     expect(result).toMatchObject({ ok: true, data: { status: "placed", simulated: true } });
-    expect(placed.reply).toMatch(/Simulated confirmation SIM-[A-Z0-9]{6}, arriving around 5pm/);
+    expect(placed.reply).toMatch(/Simulated confirmation SIM-[A-Z0-9]{6}, arriving around 5pm\. Your Amazon cart is ready/);
+    expect(result.data.cart_url).toMatch(/^https:\/\/www\.amazon\.com\/gp\/aws\/cart\/add\.html\?ASIN\.1=.*B0CS56H5HL/);
 
     // The cards' state endpoint reflects it (and would after a reload).
     const state = await (await fetch(`${base}/api/state`)).json();
     expect(state.tonight).toMatchObject({ meal: "Tomato & garlic spaghetti", previous_meal: "Chicken curry with rice" });
     expect(state.order).toMatchObject({ status: "placed" });
     expect(state.leave).toMatchObject({ leave_by: `${TODAY}T19:05` });
-    expect(state.status).toMatchObject({ protocolVersion: "2025-11-25", tools: 16, offline: true });
+    expect(state.status).toMatchObject({ protocolVersion: "2025-11-25", tools: 17, offline: true });
   });
 
   it("still speaks first, using the alert text, when the model is unavailable", async () => {

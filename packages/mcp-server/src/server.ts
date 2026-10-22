@@ -1,5 +1,5 @@
 /**
- * Builds the Unrush McpServer: 16 tools, 2 data resources and 2 MCP Apps UI resources. A fresh McpServer is created
+ * Builds the Unrush McpServer: 17 tools, 2 data resources and 2 MCP Apps UI resources. A fresh McpServer is created
  * per MCP session (see index.ts); all of them share one Unrush instance and SQLite
  * DB, so state belongs to the household, not to the session.
  */
@@ -104,12 +104,32 @@ const predictionOut = z.object({
   reasoning: z.string(),
 });
 
+const productChoice = z.object({ asin: z.string(), title: z.string(), price_usd: z.number() });
 const orderSections = z.array(
   z.object({
     section: z.string(),
-    items: z.array(z.object({ item: z.string(), ...nullableQty, section: z.string(), reasons: z.array(z.string()) })),
+    items: z.array(
+      z.object({
+        item: z.string(),
+        ...nullableQty,
+        section: z.string(),
+        reasons: z.array(z.string()),
+        product: z
+          .object({ asin: z.string(), title: z.string(), packs: z.number(), price_usd: z.number(), why: z.enum(["usual", "chosen", "only"]) })
+          .nullable()
+          .optional(),
+        choices: z.array(productChoice).optional(),
+        search_url: z.string().optional(),
+      }),
+    ),
   }),
 );
+/** Real Amazon add-to-cart link + what still needs a product choice. */
+const cartShape = {
+  cart_url: z.string().nullable(),
+  estimated_total_usd: z.number(),
+  needs_choice: z.array(z.object({ item: z.string(), choices: z.array(productChoice) })),
+};
 
 const alertOut = z.object({
   id: z.string(),
@@ -441,8 +461,9 @@ export function createUnrushServer(app: Unrush): McpServer {
       title: "Build grocery order",
       description:
         "Build a DRAFT grocery order: ingredients missing for upcoming planned dinners, staples predicted to run out, and items " +
-        "that are out, deduplicated and grouped by store section. Nothing is bought. Read 'read_back' to the user and ask " +
-        "'Shall I place the order?'.",
+        "that are out, deduplicated and grouped by store section. Each item gets the household's usual store product from purchase " +
+        "history; items listed in needs_choice have no history, so ask the user which product they want and call choose_product. " +
+        "Nothing is bought. Then read 'read_back' to the user and ask 'Shall I place the order?'.",
       inputSchema: {
         household_id: householdId,
         days_ahead: z.number().int().min(0).max(14).optional().describe("How many days of meals and run-outs to cover (default 2)"),
@@ -455,6 +476,7 @@ export function createUnrushServer(app: Unrush): McpServer {
         item_count: z.number(),
         sections: orderSections,
         read_back: z.string(),
+        ...cartShape,
         note: z.string(),
       },
     },
@@ -486,11 +508,42 @@ export function createUnrushServer(app: Unrush): McpServer {
         eta_spoken: z.string(),
         item_count: z.number(),
         sections: orderSections,
+        ...cartShape,
         note: z.string(),
       },
       annotations: { destructiveHint: false, idempotentHint: false },
     },
     (args, extra) => run("place_order", args, extra, () => app.groceries.placeOrder(args.household_id, args.order_id, args.confirmed)),
+  );
+
+  server.registerTool(
+    "choose_product",
+    {
+      title: "Choose product",
+      description:
+        "Set which store product to buy for one item in the draft grocery order, after asking the user (e.g. which pesto). " +
+        "Use an asin from that item's choices. The choice becomes the household's usual once the order is placed.",
+      inputSchema: {
+        household_id: householdId,
+        item: z.string().describe("Item name as in the order, e.g. 'pesto'"),
+        asin: z.string().describe("Product asin from the item's choices"),
+        order_id: z.string().optional().describe("Omit for the latest draft order"),
+      },
+      outputSchema: {
+        household_id: z.string(),
+        order_id: z.string(),
+        status: z.enum(["draft", "placed"]),
+        simulated: z.boolean(),
+        confirmation_number: z.string().nullable(),
+        created_at: z.string(),
+        placed_at: z.string().nullable(),
+        item_count: z.number(),
+        sections: orderSections,
+        read_back: z.string(),
+        ...cartShape,
+      },
+    },
+    (args, extra) => run("choose_product", args, extra, () => app.groceries.chooseProduct(args.household_id, args.item, args.asin, args.order_id)),
   );
 
   registerAppTool(
@@ -516,6 +569,7 @@ export function createUnrushServer(app: Unrush): McpServer {
             item_count: z.number(),
             sections: orderSections,
             read_back: z.string(),
+            ...cartShape,
           })
           .nullable(),
       },

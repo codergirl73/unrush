@@ -46,9 +46,28 @@ function script(userText: string, lastAssistant: string, today: string): Step[] 
           const out = pred.filter((p: any) => p.status === "out").map((p: any) => `${p.item}s are out`);
           const low = pred.filter((p: any) => p.status !== "out").map((p: any) => `${p.item} runs out tomorrow`);
           const order = r.find((x) => x.read_back !== undefined);
-          return `Done, spaghetti it is. Heads up: ${[...out, ...low].join(" and ")}. I've drafted an order: ${order?.read_back}. Shall I place the order?`;
+          const choice = order?.needs_choice?.[0];
+          const ask = choice
+            ? `Which ${choice.item} would you like: ${choice.choices.map((c: any) => `${c.title} for $${c.price_usd}`).join(", or ")}?`
+            : `I've drafted an order: ${order?.read_back}. Shall I place the order?`;
+          return `Done, spaghetti it is. Heads up: ${[...out, ...low].join(" and ")}. I've used your usual products. ${ask}`;
         },
       },
+    ];
+  }
+
+  const which = /which ([a-z ]+) would you like/.exec(lower(lastAssistant));
+  if (which) {
+    const pickIndex = /second|365|whole foods/.test(t) ? 1 : /third|vegan|tomato/.test(t) ? 2 : 0;
+    return [
+      { tools: () => [["get_order", {}]] },
+      {
+        tools: (r) => {
+          const c = r[0]?.order?.needs_choice?.find((n: any) => n.item === which[1]!.trim());
+          return [["choose_product", { item: which[1]!.trim(), asin: c?.choices?.[pickIndex]?.asin ?? c?.choices?.[0]?.asin }]];
+        },
+      },
+      { reply: (r) => `Got it. The order is ${r.at(-1)?.read_back}, about $${r.at(-1)?.estimated_total_usd}. Shall I place the order?` },
     ];
   }
 
@@ -56,7 +75,7 @@ function script(userText: string, lastAssistant: string, today: string): Step[] 
     return [
       { tools: () => [["get_order", {}]] },
       { tools: (r) => [["place_order", { order_id: r[0]?.order?.order_id, confirmed: true }]] },
-      { reply: (r) => `Ordered! Simulated confirmation ${r.at(-1)?.confirmation_number}, arriving around ${r.at(-1)?.eta_spoken}.` },
+      { reply: (r) => `Ordered! Simulated confirmation ${r.at(-1)?.confirmation_number}, arriving around ${r.at(-1)?.eta_spoken}. Your Amazon cart is ready to review on screen.` },
     ];
   }
 

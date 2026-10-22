@@ -16,7 +16,7 @@ At each session init the server logs the negotiated protocol version, and it war
 ✓ session initialized {"client":"…","requestedProtocol":"2025-11-25","negotiatedProtocol":"2025-11-25","target":"2025-11-25"}
 ```
 
-## Tools (16)
+## Tools (17)
 
 | Area | Tools |
 |---|---|

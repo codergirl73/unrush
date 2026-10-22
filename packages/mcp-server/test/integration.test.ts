@@ -61,6 +61,7 @@ describe("MCP over Streamable HTTP", () => {
     expect(tools.map((t) => t.name).sort()).toEqual([
       "add_or_update_event",
       "build_grocery_order",
+      "choose_product",
       "compute_leave_by",
       "get_alerts",
       "get_meal_plan",
@@ -158,6 +159,12 @@ describe("MCP over Streamable HTTP", () => {
     // 5. Build, read back, refuse without yes, then place on yes.
     const order = await data("build_grocery_order");
     expect(order.read_back).toContain("12 eggs");
+    expect(order.needs_choice.map((n: any) => n.item)).toEqual(["pesto"]);
+    const pending = await call("place_order", { confirmed: true });
+    expect(pending.isError).toBe(true);
+    expect((pending.content[0] as { text: string }).text).toMatch(/which product to buy for pesto/);
+    const chosen = await data("choose_product", { item: "pesto", asin: order.needs_choice[0].choices[0].asin });
+    expect(chosen.cart_url).toContain("amazon.com/gp/aws/cart/add.html");
     const refused = await call("place_order", { order_id: order.order_id, confirmed: false });
     expect(refused.isError).toBe(true);
     expect((refused.content[0] as { text: string }).text).toMatch(/NOT placed/);
