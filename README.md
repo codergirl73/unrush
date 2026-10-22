@@ -242,11 +242,27 @@ npm run seed              # reset everything for another take (also clears today
 - `npm run dev:offline` rehearses the UI without AWS, using the scripted stand-in (not Bedrock).
 - **Recording tip:** the demo evening runs 5:30 to 9:30pm. If you record later in the day, set `UNRUSH_NOW=15:00` in `.env`, then reseed and restart, so the Unrush clock starts at 3pm and keeps ticking.
 - **Voice:** hold the orb (or Space) to talk; Chrome has the best Web Speech support. Use the speaker toggle to mute spoken replies.
+- **Guided demo:** the step bar under the header follows the story from the live state. **Make the meeting run late** does what `npm run demo:trigger` does, and **Start over** re-seeds the day at 3pm (no `UNRUSH_NOW` needed).
+
+## Host it
+
+`deploy/deploy.sh` puts a public demo on one EC2 t4g.micro in your account. It runs the MCP server, the web backend and Caddy, which gives it automatic HTTPS on an `<ip>.sslip.io` hostname.
+
+```bash
+./deploy/deploy.sh      # reads AWS_REGION, BEDROCK_MODEL_ID and AGENTCORE_MEMORY_ID from .env; prints the URL
+./deploy/update.sh      # pull the latest main onto the instance and restart
+./deploy/teardown.sh    # delete everything it created
+```
+
+- **A household per visitor.** With `UNRUSH_PUBLIC=1`, each browser gets its own household by cookie, seeded so its day starts at 3pm whenever the visitor arrives. Each household has its own alerts, conversation and AgentCore actor, and is deleted after 24 hours.
+- **Capped Bedrock use.** Visitors get 40 messages an hour, an address can start 10 sessions an hour, and the whole site gets 1,500 Bedrock turns a day. Set these with `UNRUSH_TURNS_PER_HOUR`, `UNRUSH_HOUSEHOLDS_PER_IP_PER_HOUR` and `UNRUSH_TURNS_PER_DAY`. Past the daily cap, Unrush still speaks first using the alert text.
+- **Least privilege, no keys.** The instance's IAM role allows only Converse with the configured model and the four AgentCore Memory calls ([deploy/iam-policy.json](deploy/iam-policy.json)). Only ports 80 and 443 are open, with no SSH; use Session Manager for a shell. The MCP server listens on localhost only.
+- **Cost:** about $10 a month (t4g.micro, public IPv4 address, 8 GB disk) plus Bedrock usage.
 
 ## Test
 
 ```bash
-npm test          # 95 Vitest tests across both workspaces
+npm test          # 104 Vitest tests across both workspaces
 npm run typecheck
 ```
 
@@ -259,6 +275,7 @@ What the tests cover:
 - **Agent Skill:** front-matter validation, `load_skill` (including path escapes), and activation on proactive turns.
 - **AgentCore Memory:** command shapes against a fake data plane, continuity across a backend restart, recall in the prompt, and turns that still succeed when AgentCore fails.
 - **Phase 3 end to end:** late meeting → SSE proactive speech → swap → read-back → explicit yes → simulated confirmation, plus the fallback that still speaks first when the model is unavailable.
+- **Hosted demo:** separate households per browser, a 3pm clock whatever the real time, the late-meeting and reset endpoints, and the turn and session caps.
 
 ## Cost
 

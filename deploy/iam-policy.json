@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ConverseWithNovaLite",
+      "Effect": "Allow",
+      "Action": ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+      "Resource": [
+        "arn:aws:bedrock:*:__ACCOUNT__:inference-profile/__MODEL_ID__",
+        "arn:aws:bedrock:*::foundation-model/__FOUNDATION_MODEL__"
+      ]
+    },
+    {
+      "Sid": "ConversationMemory",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:CreateEvent",
+        "bedrock-agentcore:ListEvents",
+        "bedrock-agentcore:DeleteEvent",
+        "bedrock-agentcore:RetrieveMemoryRecords"
+      ],
+      "Resource": "arn:aws:bedrock-agentcore:__REGION__:__ACCOUNT__:memory/__MEMORY_ID__"
+    }
+  ]
+}
