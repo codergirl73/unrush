@@ -179,7 +179,7 @@ Bedrock is on the live code path for every conversation turn and every proactive
 
 **AWS services used:** Amazon Bedrock (Converse API) for the agent and tool use, and Amazon Bedrock AgentCore (Memory, data plane and control plane) for conversation and preference memory.
 
-The model is never hard-coded: set `BEDROCK_MODEL_ID` to a model or inference profile enabled in your account. Tool use is required. **Amazon Nova Lite** (`us.amazon.nova-lite-v1:0`) is the recommended small, cheap default.
+The model is never hard-coded: set `BEDROCK_MODEL_ID` to a model or inference profile enabled in your account. Tool use is required. **Amazon Nova 2 Lite** (`us.amazon.nova-2-lite-v1:0`) is the recommended small, cheap default. In our live tests it chained the 5 tool calls of the hero flow in one turn and kept replies speakable; Nova Lite (`us.amazon.nova-lite-v1:0`) also works but tends to answer in bullet lists.
 
 **Two locks on "nothing is bought without your yes":**
 1. The MCP `place_order` tool refuses unless `confirmed === true`.
@@ -215,7 +215,7 @@ This is a **simulated Alexa+ experience** in a web browser. It is not an Alexa s
 **Prerequisites:** Node.js 20.6+ (developed on Node 24) and an AWS account.
 
 1. **Enable a Bedrock model.** In the Amazon Bedrock console, pick your region (e.g. `us-east-1`), open **Model access** and enable a model that supports tool use. *Amazon Nova Lite* is cheap and fast. Many models must be called through a **cross-region inference profile** (IDs like `us.amazon.nova-lite-v1:0`); check **Cross-region inference** in the console for the exact ID available to you.
-2. **Credentials** come from the default AWS credential chain: `aws configure`, `aws sso login`, `AWS_PROFILE`, environment variables or an IAM role. The identity needs `bedrock:InvokeModel` for that model or profile.
+2. **Credentials** come from the default AWS credential chain. The simplest is `aws login` (AWS CLI 2.32+, browser sign-in, short-lived credentials); `aws configure`, `aws sso login`, `AWS_PROFILE`, environment variables or an IAM role also work. The identity needs `bedrock:InvokeModel` for that model or profile.
 3. **Install and configure:**
 
 ```bash
@@ -233,7 +233,7 @@ AgentCore Memory needs `bedrock-agentcore:CreateMemory`, `GetMemory` and `ListMe
 ```bash
 npm run dev               # MCP server :3001 + API :3000 + UI http://localhost:5173
 npm run demo:trigger      # in another terminal: the late meeting lands → Unrush speaks first
-npm run seed              # reset everything for another take
+npm run seed              # reset everything for another take (also clears today's AgentCore conversation if enabled)
 ```
 
 - `npm run chat` is a terminal REPL against Bedrock + MCP, useful to check your model before opening the UI.

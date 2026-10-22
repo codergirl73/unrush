@@ -81,7 +81,8 @@ describe("MCP over Streamable HTTP", () => {
       expect(t.outputSchema).toBeDefined();
     }
     const place = tools.find((t) => t.name === "place_order")!;
-    expect(place.inputSchema.required).toEqual(expect.arrayContaining(["household_id", "order_id", "confirmed"]));
+    expect(place.inputSchema.required).toEqual(expect.arrayContaining(["household_id", "confirmed"]));
+    expect(place.inputSchema.required).not.toContain("order_id");
     const prefs = tools.find((t) => t.name === "set_preferences")!;
     expect((prefs.inputSchema.properties as Record<string, { required?: string[] }>).weekday_rules!.required ?? []).toEqual([]);
 

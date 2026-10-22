@@ -473,7 +473,7 @@ export function createUnrushServer(app: Unrush): McpServer {
         "confirmation number and ETA. No payment or card data is ever involved.",
       inputSchema: {
         household_id: householdId,
-        order_id: z.string().describe("order_id from build_grocery_order"),
+        order_id: z.string().optional().describe("Omit to place the latest draft order (the one you just read back)"),
         confirmed: z.boolean().describe("true only after the user explicitly said yes"),
       },
       outputSchema: {

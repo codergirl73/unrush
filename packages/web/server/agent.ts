@@ -158,10 +158,16 @@ export async function runAgent(opts: RunAgentOptions): Promise<AgentResult> {
 }
 
 function textOf(blocks: ContentBlock[]): string {
-  return blocks
-    .map((b) => b.text ?? "")
-    .join(" ")
-    .trim();
+  return stripThinking(
+    blocks
+      .map((b) => b.text ?? "")
+      .join(" "),
+  );
+}
+
+/** Some models (e.g. Amazon Nova) emit <thinking>…</thinking> before the answer; it must never be spoken. */
+export function stripThinking(text: string): string {
+  return text.replace(/<thinking>[\s\S]*?(<\/thinking>|$)/gi, "").trim();
 }
 
 function fallbackReply(stop?: string): string {

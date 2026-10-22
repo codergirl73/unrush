@@ -83,7 +83,7 @@ describe("MCP → Bedrock tool conversion", () => {
     const spec = toBedrockTool(bridge.listMcpTools().find((t) => t.name === "place_order")!).toolSpec!;
     const json = spec.inputSchema!.json as { properties: Record<string, unknown>; required: string[]; $schema?: string };
     expect(json.properties).not.toHaveProperty("household_id");
-    expect(json.required.sort()).toEqual(["confirmed", "order_id"]);
+    expect(json.required).toEqual(["confirmed"]);
     expect(json.$schema).toBeUndefined();
     expect(spec.description).toMatch(/explicitly said yes/);
   });

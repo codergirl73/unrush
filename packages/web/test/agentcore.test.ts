@@ -8,7 +8,7 @@ import type { Server } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CreateEventCommand, ListEventsCommand, RetrieveMemoryRecordsCommand, type Event } from "@aws-sdk/client-bedrock-agentcore";
+import { CreateEventCommand, DeleteEventCommand, ListEventsCommand, RetrieveMemoryRecordsCommand, type Event } from "@aws-sdk/client-bedrock-agentcore";
 import type { ConverseCommand, ConverseCommandOutput } from "@aws-sdk/client-bedrock-runtime";
 import { openDb } from "../../mcp-server/src/db.js";
 import { startServer, type RunningServer } from "../../mcp-server/src/index.js";
@@ -37,6 +37,11 @@ function fakeAgentCore(opts: { fail?: boolean; records?: string[] } = {}) {
       }
       if (cmd instanceof ListEventsCommand) {
         return { events: events.filter((e) => e.actorId === cmd.input.actorId && e.sessionId === cmd.input.sessionId) };
+      }
+      if (cmd instanceof DeleteEventCommand) {
+        const i = events.findIndex((e) => e.eventId === cmd.input.eventId && e.sessionId === cmd.input.sessionId);
+        if (i >= 0) events.splice(i, 1);
+        return {};
       }
       if (cmd instanceof RetrieveMemoryRecordsCommand) {
         return { memoryRecordSummaries: (opts.records ?? []).map((text, i) => ({ memoryRecordId: `r${i}`, content: { text }, memoryStrategyId: "s", namespaces: [cmd.input.namespace] })) };
@@ -67,6 +72,17 @@ describe("AgentCoreMemory", () => {
     });
     expect(await m.loadTurns(TODAY, 1)).toEqual([{ user: "what's tonight?", assistant: "Curry." }]);
     expect(await m.loadTurns("2026-10-24", 5)).toEqual([]);
+  });
+
+  it("clears one day's conversation (used by npm run seed) without touching other days", async () => {
+    const { client, events } = fakeAgentCore();
+    const m = new AgentCoreMemory(client, "mem-1", H);
+    await m.saveTurn(TODAY, { user: "a", assistant: "b" });
+    await m.saveTurn(TODAY, { user: "c", assistant: "d" });
+    await m.saveTurn("2026-10-22", { user: "old", assistant: "day" });
+    expect(await m.clearDay(TODAY)).toBe(2);
+    expect(await m.loadTurns(TODAY, 5)).toEqual([]);
+    expect(events).toHaveLength(1);
   });
 
   it("recalls preferences from the household namespace", async () => {

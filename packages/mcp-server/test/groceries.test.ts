@@ -113,3 +113,22 @@ describe("get_order", () => {
     expect(() => app.groceries.findOrder(H, "ord_nope")).toThrow(/build_grocery_order/);
   });
 });
+
+describe("order realism and robustness", () => {
+  it("rounds meal shortfalls up to the usual pack size when there is purchase history", () => {
+    const { app } = seeded();
+    app.pantry.update(H, [{ item: "baby spinach", quantity: 150, unit: "g", action: "set" }]);
+    app.meals.savePlan(H, TODAY, [{ date: TODAY, recipe_id: "chickpea-spinach-curry" }]); // needs 100 g
+    app.pantry.update(H, [{ item: "baby spinach", quantity: 90, unit: "g", action: "set" }]); // 10 g short
+    const spinach = app.groceries.buildOrder(H).sections.flatMap((s) => s.items).find((i) => i.item === "baby spinach")!;
+    expect(spinach).toMatchObject({ quantity: 200, unit: "g" }); // seeded history: 200 g bags
+  });
+
+  it("place_order without an order_id places the latest draft (still only with confirmed=true)", () => {
+    const { app } = seeded();
+    const o = app.groceries.buildOrder(H);
+    expect(() => app.groceries.placeOrder(H, undefined, false)).toThrow(/NOT placed/);
+    expect(app.groceries.placeOrder(H, undefined, true)).toMatchObject({ order_id: o.order_id, status: "placed" });
+    expect(() => app.groceries.placeOrder(H, undefined, true)).toThrow(/no draft order/);
+  });
+});

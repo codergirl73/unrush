@@ -179,7 +179,11 @@ export class Groceries {
     }
     for (const n of needs.values()) {
       const short = this.pantry.shortfall(householdId, n.item, n.quantity, n.unit);
-      if (short) add(n.item, short.quantity, n.unit, `for ${n.meals.join(", ")}`);
+      if (!short) continue;
+      // Buy at least the usual pack size when we know it (nobody sells 10 g of spinach).
+      const pack = this.typicalPack(householdId, n.item, n.unit);
+      const quantity = short.quantity !== null && pack !== null ? Math.max(short.quantity, pack) : short.quantity;
+      add(n.item, quantity, n.unit, `for ${n.meals.join(", ")}`);
     }
 
     // 2. Staples predicted to run out (or already out).
@@ -229,6 +233,14 @@ export class Groceries {
     };
   }
 
+  /** Median quantity of past purchases of an item in this unit, or null without history. */
+  private typicalPack(householdId: string, item: string, unit: string): number | null {
+    const rows = this.ctx.db
+      .prepare("SELECT quantity FROM purchases WHERE household_id = ? AND item = ? AND unit = ? ORDER BY quantity")
+      .all(householdId, item, unit) as Array<{ quantity: number }>;
+    return rows.length ? rows[Math.floor(rows.length / 2)]!.quantity : null;
+  }
+
   getOrder(householdId: string, orderId: string) {
     validateHousehold(householdId);
     const row = this.ctx.db.prepare("SELECT * FROM orders WHERE household_id = ? AND id = ?").get(householdId, orderId) as OrderRow | undefined;
@@ -248,7 +260,15 @@ export class Groceries {
   }
 
   /** SIMULATED checkout. Refuses unless confirmed === true. Never touches payment data. */
-  placeOrder(householdId: string, orderId: string, confirmed: boolean) {
+  placeOrder(householdId: string, orderIdInput: string | undefined, confirmed: boolean) {
+    // Default to the latest draft: the order that was just read back to the user.
+    const latest = orderIdInput
+      ? undefined
+      : (this.ctx.db
+          .prepare("SELECT id FROM orders WHERE household_id = ? AND status = 'draft' ORDER BY created_at DESC, rowid DESC LIMIT 1")
+          .get(householdId) as { id: string } | undefined);
+    const orderId = orderIdInput ?? latest?.id;
+    if (!orderId) throw new UnrushError("There is no draft order to place. Call build_grocery_order and read it back first.");
     const row = this.getOrder(householdId, orderId);
     if (row.status === "placed") {
       throw new UnrushError(`Order ${orderId} was already placed (simulated confirmation ${row.confirmation}). Nothing was charged twice.`);

@@ -56,6 +56,13 @@ These are running notes from the Unrush build. The detailed issues are in [FRICT
 
 ## Amazon Bedrock (Converse API)
 
+**Live verification:** the full hero flow ran on `us.amazon.nova-2-lite-v1:0` in us-east-1:
+1. The proactive turn: `suggest_quick_meal`.
+2. "Yes": `get_meal_plan`, `suggest_quick_meal`, `save_meal_plan`, `predict_runouts`, `build_grocery_order`.
+3. "Yes": `place_order`.
+
+Credentials came from `aws login`, which the JS SDK v3 default chain picked up with no code changes.
+
 ### What worked well
 - **The Converse API fits MCP closely.** `toolSpec.inputSchema.json` accepts the MCP tool JSON Schema almost unchanged (we drop `$schema` and the hidden `household_id`). The whole adapter is about 20 lines.
 - **One request shape for all models.** Switching models is an env-var change (`BEDROCK_MODEL_ID`).

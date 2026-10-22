@@ -12,7 +12,8 @@
     "chat": "tsx --env-file-if-exists=../../.env server/cli.ts",
     "test": "vitest run",
     "typecheck": "tsc -p . && tsc -p src",
-    "agentcore:setup": "tsx --env-file-if-exists=../../.env server/agentcore-setup.ts"
+    "agentcore:setup": "tsx --env-file-if-exists=../../.env server/agentcore-setup.ts",
+    "agentcore:reset": "tsx --env-file-if-exists=../../.env server/agentcore-reset.ts"
   },
   "dependencies": {
     "@aws-sdk/client-bedrock-agentcore": "^3.1152.0",

@@ -27,7 +27,12 @@ const green = (s: string) => `\x1b[32m${s}\x1b[0m`;
 const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 
 const bridge = new McpBridge(c.mcpUrl, c.householdId, (m) => console.log(dim(m)));
-await bridge.connect();
+try {
+  await bridge.connect();
+} catch {
+  console.error(red(`✗ Can't reach the Unrush MCP server at ${c.mcpUrl}. Start it first: npm run dev (or npm run dev -w @unrush/mcp-server).`));
+  process.exit(1);
+}
 const bedrock = createBedrockClient(c);
 const skills = loadSkills();
 const tools = withSkills(bridge, skills);

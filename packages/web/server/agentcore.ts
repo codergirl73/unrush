@@ -16,6 +16,7 @@
 import {
   BedrockAgentCoreClient,
   CreateEventCommand,
+  DeleteEventCommand,
   ListEventsCommand,
   RetrieveMemoryRecordsCommand,
   type PayloadType,
@@ -72,6 +73,25 @@ export class AgentCoreMemory {
       if (user || assistant) turns.push({ user, assistant });
     }
     return turns.slice(-max);
+  }
+
+  /** Delete the day's conversation events (used by `npm run seed` so demo takes start fresh). Returns how many. */
+  async clearDay(date: string): Promise<number> {
+    const sessionId = this.sessionFor(date);
+    let deleted = 0;
+    let nextToken: string | undefined;
+    do {
+      const res = await this.client.send(
+        new ListEventsCommand({ memoryId: this.memoryId, actorId: this.actorId, sessionId, includePayloads: false, maxResults: 100, nextToken }),
+      );
+      for (const e of res.events ?? []) {
+        if (!e.eventId) continue;
+        await this.client.send(new DeleteEventCommand({ memoryId: this.memoryId, actorId: this.actorId, sessionId, eventId: e.eventId }));
+        deleted++;
+      }
+      nextToken = res.nextToken;
+    } while (nextToken);
+    return deleted;
   }
 
   /** Long-term household preferences relevant to the query (from the user-preference strategy). */
