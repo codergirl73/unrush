@@ -164,7 +164,7 @@ describe("MCP over Streamable HTTP", () => {
     expect(pending.isError).toBe(true);
     expect((pending.content[0] as { text: string }).text).toMatch(/which product to buy for pesto/);
     const chosen = await data("choose_product", { item: "pesto", asin: order.needs_choice[0].choices[0].asin });
-    expect(chosen.cart_url).toContain("amazon.com/gp/aws/cart/add.html");
+    expect(chosen.product_links.map((l: any) => l.url)).toContain("https://www.amazon.com/dp/" + order.needs_choice[0].choices[0].asin);
     const refused = await call("place_order", { order_id: order.order_id, confirmed: false });
     expect(refused.isError).toBe(true);
     expect((refused.content[0] as { text: string }).text).toMatch(/NOT placed/);

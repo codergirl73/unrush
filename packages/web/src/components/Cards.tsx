@@ -195,12 +195,15 @@ export function OrderCard({ order, onConfirm, onChoose, busy, flash }: {
               <CheckIcon />
               <div>
                 <div className="confirm-num">Order placed · {order.confirmation_number}</div>
-                <div className="muted">Simulated order recorded: no charge, no card data. Your real Amazon cart is ready to review and check out yourself.</div>
-                {order.cart_url && (
-                  <a className="cart-link" href={order.cart_url} target="_blank" rel="noopener noreferrer">
-                    Review in Amazon cart ↗
-                  </a>
-                )}
+                <div className="muted">Simulated order recorded: no charge, no card data. Open each product on Amazon and add it to your cart yourself.</div>
+                <div className="cart-links">
+                  {order.product_links.map((l) => (
+                    <a key={l.url} className="cart-link" href={l.url} target="_blank" rel="noopener noreferrer">
+                      {l.packs > 1 ? `${l.packs} × ` : ""}
+                      {l.title} ↗
+                    </a>
+                  ))}
+                </div>
               </div>
             </div>
           )}

@@ -115,7 +115,7 @@ const orderSections = z.array(
         section: z.string(),
         reasons: z.array(z.string()),
         product: z
-          .object({ asin: z.string(), title: z.string(), packs: z.number(), price_usd: z.number(), why: z.enum(["usual", "chosen", "only"]) })
+          .object({ asin: z.string(), title: z.string(), packs: z.number(), price_usd: z.number(), url: z.string(), why: z.enum(["usual", "chosen", "only"]) })
           .nullable()
           .optional(),
         choices: z.array(productChoice).optional(),
@@ -124,9 +124,9 @@ const orderSections = z.array(
     ),
   }),
 );
-/** Real Amazon add-to-cart link + what still needs a product choice. */
+/** Amazon product links (the user adds to cart there) + what still needs a product choice. */
 const cartShape = {
-  cart_url: z.string().nullable(),
+  product_links: z.array(z.object({ item: z.string(), title: z.string(), packs: z.number(), url: z.string() })),
   estimated_total_usd: z.number(),
   needs_choice: z.array(z.object({ item: z.string(), choices: z.array(productChoice) })),
 };

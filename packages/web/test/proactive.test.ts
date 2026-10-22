@@ -161,8 +161,8 @@ describe("proactive wiring", () => {
     expect(placed.tools).toEqual(["get_order", "place_order"]);
     const result = placed.events.find((e) => e.type === "tool_result" && e.name === "place_order");
     expect(result).toMatchObject({ ok: true, data: { status: "placed", simulated: true } });
-    expect(placed.reply).toMatch(/Simulated confirmation SIM-[A-Z0-9]{6}, arriving around 5pm\. Your Amazon cart is ready/);
-    expect(result.data.cart_url).toMatch(/^https:\/\/www\.amazon\.com\/gp\/aws\/cart\/add\.html\?ASIN\.1=.*B0CS56H5HL/);
+    expect(placed.reply).toMatch(/Simulated confirmation SIM-[A-Z0-9]{6}, arriving around 5pm\. Each product is linked on screen/);
+    expect((result.data.product_links as Array<{ url: string }>).map((l) => l.url)).toContain("https://www.amazon.com/dp/B0CS56H5HL");
 
     // The cards' state endpoint reflects it (and would after a reload).
     const state = await (await fetch(`${base}/api/state`)).json();

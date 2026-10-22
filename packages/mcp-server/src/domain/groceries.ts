@@ -11,7 +11,7 @@ import { compatible, humanize, round, toCanonical } from "../units.js";
 import { ensureHousehold, newId, today, validateHousehold, type Ctx } from "./ctx.js";
 import type { Meals } from "./meals.js";
 import type { Pantry } from "./pantry.js";
-import { amazonCartUrl, amazonSearchUrl, packsFor, productByAsin, productsFor, type Product } from "./catalog.js";
+import { amazonProductUrl, amazonSearchUrl, packsFor, productByAsin, productsFor, type Product } from "./catalog.js";
 
 export interface Prediction {
   item: string;
@@ -31,6 +31,8 @@ export interface ProductPick {
   title: string;
   packs: number;
   price_usd: number;
+  /** The product's page on Amazon (the user adds it to their cart there). */
+  url: string;
   /** usual = most-bought product in purchase history; chosen = picked in conversation; only = single catalog option. */
   why: "usual" | "chosen" | "only";
 }
@@ -387,7 +389,7 @@ export class Groceries {
       ...cartSummary(data.items),
       note:
         "Simulated order recorded (no payment, no card data); items were added to the pantry and purchase history so predictions and 'usual' products learn. " +
-        "To buy for real, the user opens cart_url: Amazon shows its own add-to-cart page and the user reviews and checks out there.",
+        "To buy for real, the user opens each product_links page on Amazon and adds it to their cart themselves.",
     };
   }
 }
@@ -411,14 +413,17 @@ function orderView(row: OrderRow) {
 }
 
 function pick(product: Product, line: OrderItem, why: ProductPick["why"]): ProductPick {
-  return { asin: product.asin, title: product.title, packs: packsFor(product, line.quantity, line.unit), price_usd: product.price_usd, why };
+  return { asin: product.asin, title: product.title, packs: packsFor(product, line.quantity, line.unit), price_usd: product.price_usd, url: amazonProductUrl(product.asin), why };
 }
 
-/** Real Amazon cart link for the chosen products, items still to choose, and an estimated total. */
+/** Amazon links for the order (a product page per chosen item, a search for uncovered items), items still to choose, and an estimated total. */
 function cartSummary(items: OrderItem[]) {
   const picked = items.filter((i) => i.product);
   return {
-    cart_url: amazonCartUrl(picked.map((i) => ({ asin: i.product!.asin, packs: i.product!.packs }))),
+    product_links: [
+      ...picked.map((i) => ({ item: i.item, title: i.product!.title, packs: i.product!.packs, url: i.product!.url })),
+      ...items.filter((i) => !i.product && i.search_url).map((i) => ({ item: i.item, title: `Search Amazon for ${i.item}`, packs: 1, url: i.search_url! })),
+    ],
     estimated_total_usd: Math.round(picked.reduce((s, i) => s + i.product!.price_usd * i.product!.packs, 0) * 100) / 100,
     needs_choice: items.filter((i) => !i.product && i.choices?.length).map((i) => ({ item: i.item, choices: i.choices! })),
   };

@@ -92,7 +92,7 @@ export interface OrderItem {
   unit: string | null;
   section: string;
   reasons: string[];
-  product?: (ProductChoice & { packs: number; why: "usual" | "chosen" | "only" }) | null;
+  product?: (ProductChoice & { packs: number; url: string; why: "usual" | "chosen" | "only" }) | null;
   choices?: ProductChoice[];
   search_url?: string;
 }
@@ -107,7 +107,7 @@ export interface Order {
   item_count: number;
   sections: Array<{ section: string; items: OrderItem[] }>;
   read_back: string;
-  cart_url: string | null;
+  product_links: Array<{ item: string; title: string; packs: number; url: string }>;
   estimated_total_usd: number;
   needs_choice: Array<{ item: string; choices: ProductChoice[] }>;
 }

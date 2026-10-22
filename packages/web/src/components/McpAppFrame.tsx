@@ -54,7 +54,7 @@ export function McpAppFrame({ uri, toolName, result, theme, onMessage }: Props) 
       if (text) onMessageRef.current(text);
       return {};
     };
-    // Views may only open Amazon cart/search links (the real cart handoff), in a new tab.
+    // Views may only open Amazon product/search links (the real handoff), in a new tab.
     b.onopenlink = async ({ url }) => {
       if (!/^https:\/\/www\.amazon\.com\//.test(url)) return { isError: true };
       window.open(url, "_blank", "noopener,noreferrer");

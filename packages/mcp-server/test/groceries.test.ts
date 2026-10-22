@@ -93,7 +93,7 @@ describe("place_order", () => {
     expect(r).toMatchObject({ status: "placed", simulated: true, eta: `${TODAY}T17:00`, eta_spoken: "5pm" });
     expect(r.confirmation_number).toMatch(/^SIM-[A-Z0-9]{6}$/);
     expect(r.note).toMatch(/Simulated order recorded \(no payment, no card data\)/);
-    expect(r.cart_url).toContain("amazon.com/gp/aws/cart/add.html");
+    expect(r.product_links.map((l) => l.url)).toContain("https://www.amazon.com/dp/B07YSWG9WS");
     expect(app.pantry.row(H, "egg")).toEqual({ quantity: 12, unit: "count" });
     expect(app.pantry.row(H, "whole milk")).toEqual({ quantity: 2600, unit: "ml" });
     expect(app.groceries.predictRunouts(H, 2).predictions).toEqual([]);
@@ -136,7 +136,7 @@ describe("order realism and robustness", () => {
   });
 });
 
-describe("store products: your usual, choices and a real Amazon cart", () => {
+describe("store products: your usual, choices and Amazon product links", () => {
   it("picks the usual product from purchase history and asks about items without history", () => {
     const { app } = seeded();
     const o = app.groceries.buildOrder(H);
@@ -150,14 +150,17 @@ describe("store products: your usual, choices and a real Amazon cart", () => {
     expect(o.note).toMatch(/Ask the user which product they want for: pesto/);
   });
 
-  it("builds Amazon's add-to-cart link from chosen products, with an estimated total", () => {
+  it("links each chosen product to its Amazon page, with an estimated total", () => {
     const { app } = seeded();
     app.groceries.buildOrder(H);
     const r = app.groceries.chooseProduct(H, "pesto", "B0CS56H5HL");
     expect(r.needs_choice).toEqual([]);
-    expect(r.cart_url).toMatch(/^https:\/\/www\.amazon\.com\/gp\/aws\/cart\/add\.html\?ASIN\.1=/);
-    for (const asin of ["B07YSWG9WS", "B07GBM7TZJ", "B0CS56H5HL"]) expect(r.cart_url).toContain(asin);
-    expect(r.cart_url).toMatch(/Quantity\.1=1/);
+    expect(r.product_links.map((l) => l.url).sort()).toEqual([
+      "https://www.amazon.com/dp/B07GBM7TZJ",
+      "https://www.amazon.com/dp/B07YSWG9WS",
+      "https://www.amazon.com/dp/B0CS56H5HL",
+    ]);
+    expect(r.product_links.find((l) => l.item === "pesto")).toMatchObject({ title: "Amazon Grocery Basil Pesto, 8 oz", packs: 1 });
     expect(r.estimated_total_usd).toBeGreaterThan(8);
   });
 
@@ -174,7 +177,7 @@ describe("store products: your usual, choices and a real Amazon cart", () => {
     expect(() => app.groceries.chooseProduct(H, "caviar", "B0CS56H5HL")).toThrow(/not in order/);
     app.groceries.chooseProduct(H, "pesto", "B085DTX3K8");
     const placed = app.groceries.placeOrder(H, undefined, true);
-    expect(placed.cart_url).toContain("B085DTX3K8");
+    expect(placed.product_links.map((l) => l.url)).toContain("https://www.amazon.com/dp/B085DTX3K8");
     app.pantry.update(H, [{ item: "pesto", action: "remove" }]);
     const next = app.groceries.buildOrder(H).sections.flatMap((s) => s.items).find((i) => i.item === "pesto")!;
     expect(next.product).toMatchObject({ asin: "B085DTX3K8", why: "usual" });

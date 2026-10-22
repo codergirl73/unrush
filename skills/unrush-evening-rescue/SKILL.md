@@ -36,7 +36,7 @@ Do this in the same turn as the dinner swap:
 ## 4. Place the order only on an explicit yes
 
 - Call `place_order` with `confirmed: true` **only** if the person's latest message is a clear yes to "Shall I place the order?". See [references/consent.md](references/consent.md).
-- Then say the simulated confirmation number and ETA, and that their Amazon cart is ready to review on screen. Unrush never pays: the person reviews and checks out on Amazon themselves.
+- Then say the simulated confirmation number and ETA, and that each product is linked on screen to its Amazon page. Unrush never pays: the person adds items to their Amazon cart and checks out themselves.
 - If they hesitate or say anything other than yes, do not order. Offer to change the list instead.
 
 ## Don'ts

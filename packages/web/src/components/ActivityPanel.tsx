@@ -186,7 +186,7 @@ function summarizeResult(name: string, r: { ok: boolean; data: Record<string, un
     case "get_order":
       return d.order ? `${d.order.status} · ${d.order.item_count} items` : "no orders";
     case "place_order":
-      return `placed · ${d.confirmation_number} (simulated) · Amazon cart ready`;
+      return `placed · ${d.confirmation_number} (simulated) · ${d.product_links?.length ?? 0} Amazon product links`;
     case "get_alerts":
       return `${d.count} alert(s)`;
     default:

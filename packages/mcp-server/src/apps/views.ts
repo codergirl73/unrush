@@ -25,7 +25,8 @@ h1{font-size:15px;margin:0 0 10px;display:flex;justify-content:space-between;ali
 .q{color:var(--brand);font-weight:700;min-width:56px}
 button{margin-top:12px;width:100%;padding:10px;border:0;border-radius:10px;background:var(--brand);color:#fff;font:inherit;font-weight:650;cursor:pointer}
 .done{margin-top:12px;padding:10px 12px;border-radius:10px;background:var(--okbg);color:var(--ok);font-weight:700}
-.empty{color:var(--muted)}`;
+.empty{color:var(--muted)}
+button.link{margin-top:8px;background:transparent;color:var(--brand);border:1px solid var(--brand);text-align:left;font-weight:600}`;
 
 function page(title: string, body: string, script: string): string {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title><style>${CSS}</style></head>
@@ -91,10 +92,9 @@ app.ontoolresult = (p) => {
   const action = document.getElementById("action");
   if (o.status === "placed") {
     action.innerHTML = '<div class="done">Order placed · ' + esc(o.confirmation_number) + (o.eta_spoken ? " · arriving around " + esc(o.eta_spoken) : "") +
-      '<div class="muted">Simulated order recorded: no charge, no card data. Your Amazon cart is ready to review.</div></div>' +
-      (o.cart_url ? '<button id="cart">Review in Amazon cart ↗</button>' : "");
-    const cart = document.getElementById("cart");
-    if (cart) cart.onclick = () => app.openLink({ url: o.cart_url });
+      '<div class="muted">Simulated order recorded: no charge, no card data. Open each product on Amazon to add it to your cart.</div></div>' +
+      (o.product_links || []).map((l, k) => '<button class="link" data-k="' + k + '">' + (l.packs > 1 ? l.packs + " × " : "") + esc(l.title) + " on Amazon ↗</button>").join("");
+    action.querySelectorAll("button.link").forEach((b) => { b.onclick = () => app.openLink({ url: o.product_links[Number(b.dataset.k)].url }); });
   } else {
     const pending = (o.needs_choice || []).length;
     action.innerHTML = '<button id="yes"' + (pending ? " disabled" : "") + '>Yes, place the order</button><div class="muted">' +

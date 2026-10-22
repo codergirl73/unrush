@@ -1,12 +1,14 @@
 /**
- * Store products Unrush can put in a real Amazon cart. Amazon's own grocery brands
- * only (Amazon Grocery, 365 by Whole Foods Market), so no third-party brands
- * appear. ASINs, titles and prices were read from amazon.com search results on
- * 2026-10-22; prices are a snapshot for estimates and the cart shows live ones.
+ * Store products Unrush links to on Amazon. Amazon's own grocery brands only
+ * (Amazon Grocery, 365 by Whole Foods Market), so no third-party brands appear.
+ * ASINs, titles and prices were read from amazon.com search results on
+ * 2026-10-22; prices are a snapshot for estimates and Amazon shows live ones.
  *
- * The cart itself is Amazon's documented add-to-cart link: opening it shows
- * Amazon's own confirmation page, and the user reviews and checks out there.
- * Unrush never places a real order and never sees payment details.
+ * The handoff is a link per product (amazon.com/dp/<ASIN>): the user opens the
+ * exact product page and taps Add to Cart themselves. (Amazon's older bulk
+ * add-to-cart link, /gp/aws/cart/add.html, redirected to an empty cart when we
+ * tested it signed in, so we don't use it.) Unrush never places a real order
+ * and never sees payment details.
  */
 import { toCanonical } from "../units.js";
 
@@ -56,11 +58,9 @@ export function packsFor(product: Product, quantity: number | null, unit: string
   return Math.max(1, Math.round(need.quantity / pack.quantity));
 }
 
-/** Amazon's documented add-to-cart link (ASIN.n / Quantity.n). */
-export function amazonCartUrl(lines: Array<{ asin: string; packs: number }>): string | null {
-  if (lines.length === 0) return null;
-  const params = lines.map((l, i) => `ASIN.${i + 1}=${encodeURIComponent(l.asin)}&Quantity.${i + 1}=${l.packs}`).join("&");
-  return `https://www.amazon.com/gp/aws/cart/add.html?${params}`;
+/** The product's page on Amazon, where the user adds it to their cart. */
+export function amazonProductUrl(asin: string): string {
+  return `https://www.amazon.com/dp/${encodeURIComponent(asin)}`;
 }
 
 /** Search link for items the catalog doesn't cover. */

@@ -75,7 +75,7 @@ function script(userText: string, lastAssistant: string, today: string): Step[] 
     return [
       { tools: () => [["get_order", {}]] },
       { tools: (r) => [["place_order", { order_id: r[0]?.order?.order_id, confirmed: true }]] },
-      { reply: (r) => `Ordered! Simulated confirmation ${r.at(-1)?.confirmation_number}, arriving around ${r.at(-1)?.eta_spoken}. Your Amazon cart is ready to review on screen.` },
+      { reply: (r) => `Ordered! Simulated confirmation ${r.at(-1)?.confirmation_number}, arriving around ${r.at(-1)?.eta_spoken}. Each product is linked on screen to add to your Amazon cart.` },
     ];
   }
 
