@@ -254,9 +254,9 @@ export class Groceries {
         list.length === 0
           ? "Nothing needed right now."
           : cart.needs_choice.length > 0
-            ? "Before reading the order back, ask the user to choose a product for: " +
+            ? "Ask the user which product they want for: " +
               cart.needs_choice.map((n) => `${n.item} (${n.choices.map((c) => c.title).join(" / ")})`).join("; ") +
-              ". Then call choose_product. Only call place_order with confirmed=true after an explicit yes."
+              ". Ask only that for now; after their answer call choose_product, then read the order back."
             : "Read this order back (mention usual products briefly) and ask 'Shall I place the order?'. Only call place_order with confirmed=true after an explicit yes.",
     };
   }

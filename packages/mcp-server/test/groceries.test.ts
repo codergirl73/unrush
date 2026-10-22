@@ -147,7 +147,7 @@ describe("store products: your usual, choices and a real Amazon cart", () => {
     expect(pesto.product).toBeNull();
     expect(pesto.choices!.map((c) => c.asin)).toEqual(["B0CS56H5HL", "B085DTX3K8", "B08KT6N4SH"]);
     expect(o.needs_choice.map((n) => n.item)).toEqual(["pesto"]);
-    expect(o.note).toMatch(/ask the user to choose a product for: pesto/);
+    expect(o.note).toMatch(/Ask the user which product they want for: pesto/);
   });
 
   it("builds Amazon's add-to-cart link from chosen products, with an estimated total", () => {
