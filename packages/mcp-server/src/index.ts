@@ -16,6 +16,8 @@ import { isInitializeRequest, LATEST_PROTOCOL_VERSION, type JSONRPCMessage } fro
 import { openDb, resolveDbPath } from "./db.js";
 import { log } from "./log.js";
 import { createUnrushServer } from "./server.js";
+import { countVisitors, pruneVisitors, seedDemo, VISITOR_PREFIX } from "./seed.js";
+import { validateHousehold } from "./domain/ctx.js";
 import { Unrush, type UnrushOptions } from "./service.js";
 
 /** The spec revision this server is built and judged against. */
@@ -30,6 +32,13 @@ export interface StartOptions {
   /** Proactive checker interval (default 60 s). 0 disables the timer (checks still run after every write). */
   proactiveIntervalMs?: number;
   unrush?: UnrushOptions;
+  /**
+   * Demo endpoints for the web backend (POST /demo/households seeds a household; GET checks one).
+   * Plain HTTP beside /mcp, not MCP tools, so the model never sees them. Default on; UNRUSH_DEMO_API=0 disables.
+   */
+  demoApi?: boolean;
+  /** Most visitor households kept at once (default 500). */
+  maxVisitors?: number;
 }
 
 export interface RunningServer {
@@ -73,6 +82,34 @@ export async function startServer(opts: StartOptions = {}): Promise<RunningServe
   web.get("/health", (_req, res) => {
     res.json({ ok: true, sessions: transports.size, protocol: TARGET_PROTOCOL_VERSION });
   });
+
+  if (opts.demoApi ?? process.env.UNRUSH_DEMO_API !== "0") {
+    const maxVisitors = opts.maxVisitors ?? 500;
+    web.post("/demo/households", (req: Request, res: Response) => {
+      const body = (req.body ?? {}) as { household_id?: string; start_at?: string };
+      const id = body.household_id ?? `${VISITOR_PREFIX}${randomUUID().replace(/-/g, "").slice(0, 16)}`;
+      try {
+        validateHousehold(id);
+        if (body.start_at !== undefined && !/^\d{2}:\d{2}$/.test(body.start_at)) throw new Error('start_at must be "HH:MM".');
+        if (!body.household_id) {
+          pruneVisitors(db);
+          if (countVisitors(db) >= maxVisitors) {
+            res.status(429).json({ error: "The demo is full right now. Try again later." });
+            return;
+          }
+        }
+        const r = seedDemo(db, id, { ...opts.unrush, clock: app.ctx.clock, startAt: body.start_at });
+        log("demo household seeded", { household: id, now: r.now });
+        res.json({ household_id: id, now: r.now, today: r.today });
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+      }
+    });
+    web.get("/demo/households/:id", (req: Request, res: Response) => {
+      const row = db.prepare("SELECT id FROM households WHERE id = ?").get(String(req.params.id));
+      res.status(row ? 200 : 404).json({ exists: !!row });
+    });
+  }
 
   web.post("/mcp", async (req: Request, res: Response) => {
     const sessionId = req.header("mcp-session-id");

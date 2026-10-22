@@ -20,7 +20,9 @@ const SCHEMA = `
 CREATE TABLE IF NOT EXISTS households (
   id          TEXT PRIMARY KEY,
   name        TEXT,
-  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  -- Minutes added to the clock for this household, so a public-demo visitor's day starts at 3pm whenever they arrive.
+  clock_offset_min INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS pantry_items (
@@ -127,5 +129,7 @@ export function openDb(path: string): DB {
   // Migration for databases created before product_id existed.
   const cols = db.prepare("PRAGMA table_info(purchases)").all() as Array<{ name: string }>;
   if (!cols.some((c) => c.name === "product_id")) db.exec("ALTER TABLE purchases ADD COLUMN product_id TEXT");
+  const hh = db.prepare("PRAGMA table_info(households)").all() as Array<{ name: string }>;
+  if (!hh.some((c) => c.name === "clock_offset_min")) db.exec("ALTER TABLE households ADD COLUMN clock_offset_min INTEGER NOT NULL DEFAULT 0");
   return db;
 }

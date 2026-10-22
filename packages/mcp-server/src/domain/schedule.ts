@@ -43,7 +43,7 @@ export class Schedule {
     private readonly prefs: PreferencesStore,
   ) {}
 
-  get(householdId: string, date = today(this.ctx)) {
+  get(householdId: string, date = today(this.ctx, householdId)) {
     validateHousehold(householdId);
     checkDate(date, "date");
     const events = this.ctx.calendar.listEvents(householdId, date).map((e) => ({
@@ -53,7 +53,7 @@ export class Schedule {
     return {
       household_id: householdId,
       date,
-      now: this.ctx.clock.now(),
+      now: this.ctx.now(householdId),
       calendar_provider: this.ctx.calendar.name,
       simulated: this.ctx.calendar.simulated,
       events,
@@ -64,7 +64,7 @@ export class Schedule {
   addOrUpdate(householdId: string, input: EventInput) {
     ensureHousehold(this.ctx, householdId);
     for (const [field, v] of [["start", input.start], ["end", input.end]] as const) {
-      if (!isLocalDateTime(v)) throw new UnrushError(`Invalid ${field} "${v}". Use local time YYYY-MM-DDTHH:MM, e.g. ${today(this.ctx)}T19:00.`);
+      if (!isLocalDateTime(v)) throw new UnrushError(`Invalid ${field} "${v}". Use local time YYYY-MM-DDTHH:MM, e.g. ${today(this.ctx, householdId)}T19:00.`);
     }
     if (toMinutes(input.end) <= toMinutes(input.start)) throw new UnrushError("end must be after start.");
     if (!input.title?.trim()) throw new UnrushError("title is required.");
@@ -73,7 +73,7 @@ export class Schedule {
     const event = this.ctx.calendar.upsertEvent(
       householdId,
       { id, title: input.title.trim(), start: input.start, end: input.end, location: input.location?.trim() || null },
-      this.ctx.clock.now(),
+      this.ctx.now(householdId),
     );
     this.ctx.changed(householdId, "calendar");
     return { household_id: householdId, created: !existed, event, simulated: this.ctx.calendar.simulated };
@@ -133,9 +133,9 @@ export class Schedule {
    * Free stretches tonight for cooking: from max(now, cook_window_start) to
    * latest_dinner_time, minus each event (including travel there and back).
    */
-  freeWindows(householdId: string, date = today(this.ctx)): Window[] {
+  freeWindows(householdId: string, date = today(this.ctx, householdId)): Window[] {
     const prefs = this.prefs.get(householdId).preferences;
-    const now = this.ctx.clock.now();
+    const now = this.ctx.now(householdId);
     let from = toMinutes(at(date, prefs.cook_window_start));
     const to = toMinutes(at(date, prefs.latest_dinner_time));
     if (dateOf(now) === date) from = Math.max(from, toMinutes(now));

@@ -145,7 +145,7 @@ export class Meals {
     validateHousehold(householdId);
     if (!Number.isFinite(maxMinutes) || maxMinutes < 5) throw new UnrushError("max_minutes must be at least 5.");
     const prefs = this.prefs.get(householdId).preferences;
-    const date = today(this.ctx);
+    const date = today(this.ctx, householdId);
     const candidates = RECIPES.filter((r) => r.prep_minutes <= maxMinutes)
       .filter((r) => ruleWarnings(date, r.name, r.ingredients, prefs).length === 0)
       .map((r) => {
@@ -215,7 +215,7 @@ export class Meals {
         this.pantry.logConsumption(householdId, ing.item, { quantity: Math.min(need.quantity, have.quantity), unit: have.unit }, `cooked ${day.meal}`);
         changes.push({ item: ing.item, before: humanize(have.quantity, have.unit), after: left > 0 ? humanize(left, have.unit) : null });
       }
-      this.ctx.db.prepare("UPDATE meal_plan_days SET cooked_at = ? WHERE household_id = ? AND date = ?").run(this.ctx.clock.now(), householdId, date);
+      this.ctx.db.prepare("UPDATE meal_plan_days SET cooked_at = ? WHERE household_id = ? AND date = ?").run(this.ctx.now(householdId), householdId, date);
     })();
     this.ctx.changed(householdId, "pantry");
     return { household_id: householdId, date, meal: day.meal, already_cooked: false, pantry_changes: changes, notes };

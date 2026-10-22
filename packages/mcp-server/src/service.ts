@@ -13,7 +13,7 @@ import { ProactiveEngine } from "./domain/proactive.js";
 import { Schedule } from "./domain/schedule.js";
 import { SimulatedCalendar, type CalendarProvider } from "./providers/calendar.js";
 import { SimulatedTravel, type TravelProvider } from "./providers/travel.js";
-import { clockFromEnv, type Clock } from "./time.js";
+import { addMinutes, clockFromEnv, type Clock } from "./time.js";
 
 export interface UnrushOptions {
   clock?: Clock;
@@ -34,9 +34,15 @@ export class Unrush {
 
   constructor(db: DB, opts: UnrushOptions = {}) {
     const mode = opts.proactiveOnChange ?? "queue";
+    const clock = opts.clock ?? clockFromEnv();
+    const offset = db.prepare("SELECT clock_offset_min FROM households WHERE id = ?").pluck();
     this.ctx = {
       db,
-      clock: opts.clock ?? clockFromEnv(),
+      clock,
+      now: (householdId: string) => {
+        const min = (offset.get(householdId) as number | undefined) ?? 0;
+        return min ? addMinutes(clock.now(), min) : clock.now();
+      },
       calendar: opts.calendar ?? new SimulatedCalendar(db),
       travel: opts.travel ?? new SimulatedTravel(),
       changed: (householdId: string, _kind: ChangeKind) => {

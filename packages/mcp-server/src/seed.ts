@@ -12,7 +12,7 @@ import { openDb, resolveDbPath, type DB } from "./db.js";
 import { log } from "./log.js";
 import { normalizeItemName } from "./names.js";
 import { Unrush, type UnrushOptions } from "./service.js";
-import { at } from "./time.js";
+import { at, toMinutes } from "./time.js";
 import { toCanonical } from "./units.js";
 
 export const DEMO_HOUSEHOLD = "demo-household";
@@ -92,15 +92,23 @@ function mealPlan(weekStart: string, todayIso: string) {
   });
 }
 
-export function seedDemo(db: DB, householdId = DEMO_HOUSEHOLD, opts: UnrushOptions = {}) {
-  const app = new Unrush(db, { ...opts, proactiveOnChange: "off" });
-  const now = app.ctx.clock.now();
+export interface SeedOptions extends UnrushOptions {
+  /** "HH:MM": start this household's day at that time, whatever the real time is (public demo: "15:00"). */
+  startAt?: string;
+}
+
+export function seedDemo(db: DB, householdId = DEMO_HOUSEHOLD, opts: SeedOptions = {}) {
+  const { startAt, ...unrush } = opts;
+  const app = new Unrush(db, { ...unrush, proactiveOnChange: "off" });
+  const base = app.ctx.clock.now();
+  const now = startAt ? at(base.slice(0, 10), startAt) : base;
+  const offset = toMinutes(now) - toMinutes(base);
   const today = now.slice(0, 10);
   const weekStart = mondayOf(today);
 
   db.transaction(() => {
     db.prepare("DELETE FROM households WHERE id = ?").run(householdId); // cascades to every table
-    db.prepare("INSERT INTO households (id, name) VALUES (?, ?)").run(householdId, "Maya & Sam's student flat");
+    db.prepare("INSERT INTO households (id, name, clock_offset_min) VALUES (?, ?, ?)").run(householdId, "Maya & Sam's student flat", offset);
 
     app.prefs.set(householdId, {
       household_size: 2,
@@ -141,6 +149,20 @@ export function seedDemo(db: DB, householdId = DEMO_HOUSEHOLD, opts: UnrushOptio
   })();
 
   return { householdId, today, now, weekStart };
+}
+
+/** Public-demo visitor households are "v-<random>". */
+export const VISITOR_PREFIX = "v-";
+
+/** Delete visitor households created more than `hours` ago. Returns how many. */
+export function pruneVisitors(db: DB, hours = 24): number {
+  return db
+    .prepare(`DELETE FROM households WHERE id LIKE '${VISITOR_PREFIX}%' AND created_at < datetime('now', ?)`)
+    .run(`-${hours} hours`).changes;
+}
+
+export function countVisitors(db: DB): number {
+  return db.prepare(`SELECT COUNT(*) FROM households WHERE id LIKE '${VISITOR_PREFIX}%'`).pluck().get() as number;
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

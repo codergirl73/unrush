@@ -13,6 +13,8 @@ export type ChangeKind = "calendar" | "pantry" | "plan" | "orders" | "preference
 export interface Ctx {
   db: DB;
   clock: Clock;
+  /** The household's local time: the clock plus the household's demo offset (0 unless seeded with a start time). */
+  now(householdId: string): string;
   calendar: CalendarProvider;
   travel: TravelProvider;
   /** Called after any write so the proactive checker can re-run immediately. */
@@ -39,8 +41,8 @@ export function listHouseholds(ctx: Ctx): Array<{ id: string; name: string | nul
   return ctx.db.prepare("SELECT id, name FROM households ORDER BY id").all() as Array<{ id: string; name: string | null }>;
 }
 
-export function today(ctx: Ctx): string {
-  return ctx.clock.now().slice(0, 10);
+export function today(ctx: Ctx, householdId: string): string {
+  return ctx.now(householdId).slice(0, 10);
 }
 
 export function newId(prefix: string): string {

@@ -59,7 +59,7 @@ export class ProactiveEngine {
     validateHousehold(householdId);
     const findings = [...this.leaveBy(householdId), ...this.mealFit(householdId), ...this.runouts(householdId)];
     const created: Alert[] = [];
-    const now = this.ctx.clock.now();
+    const now = this.ctx.now(householdId);
 
     this.ctx.db.transaction(() => {
       const insert = this.ctx.db.prepare(
@@ -94,13 +94,13 @@ export class ProactiveEngine {
          WHERE household_id = ? AND status IN (${statuses.map(() => "?").join(",")}) AND created_at >= ?
          ORDER BY created_at, rowid`,
       )
-      .all(householdId, ...statuses, `${addDays(today(this.ctx), -1)}T00:00`) as Array<Omit<Alert, "data"> & { data: string }>;
+      .all(householdId, ...statuses, `${addDays(today(this.ctx, householdId), -1)}T00:00`) as Array<Omit<Alert, "data"> & { data: string }>;
     const alerts: Alert[] = rows.map((r) => ({ ...r, data: JSON.parse(r.data) as Record<string, unknown> }));
     if (opts.markDelivered) {
       const mark = this.ctx.db.prepare("UPDATE alerts SET status = 'delivered' WHERE id = ? AND status = 'pending'");
       for (const a of alerts) if (a.status === "pending") mark.run(a.id);
     }
-    return { household_id: householdId, now: this.ctx.clock.now(), count: alerts.length, alerts };
+    return { household_id: householdId, now: this.ctx.now(householdId), count: alerts.length, alerts };
   }
 
   /** Mark every current pending alert as delivered (used by the seed so a fresh demo starts quiet). */
@@ -149,9 +149,9 @@ export class ProactiveEngine {
 
   /** (a) An upcoming event whose departure is squeezed by the previous event, or is soon. */
   private leaveBy(householdId: string): Finding[] {
-    const now = this.ctx.clock.now();
+    const now = this.ctx.now(householdId);
     const out: Finding[] = [];
-    for (const e of this.ctx.calendar.listEvents(householdId, today(this.ctx))) {
+    for (const e of this.ctx.calendar.listEvents(householdId, today(this.ctx, householdId))) {
       if (e.start <= now) continue;
       const lb = this.schedule.computeLeaveBy(householdId, e.id);
       if (!lb.needs_travel) continue;
@@ -192,7 +192,7 @@ export class ProactiveEngine {
 
   /** (b) Tonight's planned, uncooked dinner takes longer than the longest free stretch. */
   private mealFit(householdId: string): Finding[] {
-    const date = today(this.ctx);
+    const date = today(this.ctx, householdId);
     const day = this.meals.getDay(householdId, date);
     if (!day || day.cooked) return [];
     const windows = this.schedule.freeWindows(householdId, date);
@@ -225,7 +225,7 @@ export class ProactiveEngine {
   private runouts(householdId: string): Finding[] {
     const { predictions } = this.groceries.predictRunouts(householdId, RUNOUT_DAYS);
     if (predictions.length === 0) return [];
-    const date = today(this.ctx);
+    const date = today(this.ctx, householdId);
     const out = predictions.filter((p) => p.status === "out").map((p) => p.item);
     const low = predictions.filter((p) => p.status !== "out");
     const parts = [

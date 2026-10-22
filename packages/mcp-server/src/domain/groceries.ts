@@ -81,8 +81,8 @@ export class Groceries {
   predictRunouts(householdId: string, daysAhead = 7) {
     validateHousehold(householdId);
     if (!Number.isInteger(daysAhead) || daysAhead < 0 || daysAhead > 60) throw new UnrushError("days_ahead must be a whole number 0-60.");
-    const now = this.ctx.clock.now();
-    const date = today(this.ctx);
+    const now = this.ctx.now(householdId);
+    const date = today(this.ctx, householdId);
     const rows = this.ctx.db
       .prepare("SELECT item, quantity, unit, purchased_at FROM purchases WHERE household_id = ? ORDER BY item, purchased_at")
       .all(householdId) as Array<{ item: string; quantity: number; unit: string; purchased_at: string }>;
@@ -175,7 +175,7 @@ export class Groceries {
    */
   buildOrder(householdId: string, daysAhead = 2) {
     ensureHousehold(this.ctx, householdId);
-    const date = today(this.ctx);
+    const date = today(this.ctx, householdId);
     const items = new Map<string, OrderItem & { canonical: { quantity: number | null; unit: string } }>();
     const add = (item: string, quantity: number | null, unit: string, reason: string) => {
       const prev = items.get(item);
@@ -239,7 +239,7 @@ export class Groceries {
     if (list.length > 0) {
       this.ctx.db
         .prepare("INSERT INTO orders (id, household_id, status, data, created_at) VALUES (?, ?, 'draft', ?, ?)")
-        .run(id, householdId, JSON.stringify(data), this.ctx.clock.now());
+        .run(id, householdId, JSON.stringify(data), this.ctx.now(householdId));
       this.ctx.changed(householdId, "orders");
     }
     const cart = cartSummary(list);
@@ -358,7 +358,7 @@ export class Groceries {
         `Order NOT placed: ask the user which product to buy for ${pending.map((i) => `${i.item} (${i.choices!.map((c) => c.title).join(" / ")})`).join("; ")}, then call choose_product.`,
       );
     }
-    const now = this.ctx.clock.now();
+    const now = this.ctx.now(householdId);
     const confirmation = `SIM-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
     const eta = addMinutes(now, DELIVERY_MINUTES);
 

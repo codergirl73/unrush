@@ -53,16 +53,16 @@ export class Pantry {
         `INSERT INTO pantry_items (household_id, item, quantity, unit, updated_at) VALUES (?, ?, ?, ?, ?)
          ON CONFLICT(household_id, item) DO UPDATE SET quantity = excluded.quantity, unit = excluded.unit, updated_at = excluded.updated_at`,
       )
-      .run(householdId, item, round(quantity), unit, this.ctx.clock.now());
+      .run(householdId, item, round(quantity), unit, this.ctx.now(householdId));
   }
 
-  logPurchase(householdId: string, item: string, q: Qty, source: string, at = this.ctx.clock.now(), productId?: string) {
+  logPurchase(householdId: string, item: string, q: Qty, source: string, at = this.ctx.now(householdId), productId?: string) {
     this.ctx.db
       .prepare("INSERT INTO purchases (household_id, item, quantity, unit, purchased_at, source, product_id) VALUES (?, ?, ?, ?, ?, ?, ?)")
       .run(householdId, item, q.quantity, q.unit, at, source, productId ?? null);
   }
 
-  logConsumption(householdId: string, item: string, q: Qty | null, reason: string, at = this.ctx.clock.now()) {
+  logConsumption(householdId: string, item: string, q: Qty | null, reason: string, at = this.ctx.now(householdId)) {
     this.ctx.db
       .prepare("INSERT INTO consumption_log (household_id, item, quantity, unit, reason, logged_at) VALUES (?, ?, ?, ?, ?, ?)")
       .run(householdId, item, q?.quantity ?? null, q?.unit ?? null, reason, at);
