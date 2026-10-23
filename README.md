@@ -8,7 +8,7 @@ Built for **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track + AWS
 
 ![Unrush demo: the 5:30 meeting runs late, Unrush speaks first with a leave-by time and a 15-minute dinner swap, picks the usual groceries, asks which pesto, and places a simulated order only after an explicit yes, with a link to each product on Amazon.](docs/media/unrush-demo.gif)
 
-▶️ **[Watch the 3-minute demo with narration and sound](docs/media/unrush-demo.mp4)** (MP4, 1080p). The script is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
+▶️ **[Watch the 3-minute demo with sound: codergirl73.github.io/unrush](https://codergirl73.github.io/unrush/)** ([MP4 file](docs/media/unrush-demo.mp4)). The script is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
 
 *Both were recorded locally on real Amazon Bedrock (Nova 2 Lite) with AgentCore Memory, using the guided demo: make the meeting run late → Unrush speaks first → say yes → pick a pesto → "Yes, place the order." To try it yourself, see [Setup](#setup) and [Run](#run).*
 
