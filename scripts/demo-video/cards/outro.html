@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Unrush outro</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; }
+  body {
+    font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; color: white;
+    background: radial-gradient(1200px 700px at 15% 0%, rgba(79, 70, 229, 0.5), transparent 60%),
+      radial-gradient(900px 600px at 100% 100%, rgba(20, 184, 166, 0.4), transparent 60%), #0b0f1d;
+    padding: 90px 120px; display: flex; flex-direction: column; gap: 56px;
+  }
+  h2 { font-size: 40px; font-weight: 700; color: rgba(255, 255, 255, 0.7); letter-spacing: -0.01em; animation: rise 0.9s both; }
+  .arch { display: grid; grid-template-columns: 1fr 70px 1.25fr 70px 1.25fr; align-items: center; animation: rise 0.9s 0.2s both; }
+  .box { border-radius: 22px; padding: 28px 30px; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16); min-height: 230px; }
+  .box h3 { font-size: 30px; margin-bottom: 14px; }
+  .box p { font-size: 21px; line-height: 1.5; color: rgba(255, 255, 255, 0.75); }
+  .box.mcp { border-color: rgba(45, 212, 191, 0.6); }
+  .box.agent { border-color: rgba(165, 180, 252, 0.6); }
+  .arrow { text-align: center; font-size: 40px; color: rgba(255, 255, 255, 0.5); }
+  .aws { display: flex; gap: 18px; justify-content: center; animation: rise 0.9s 0.4s both; }
+  .aws span { font-size: 22px; font-weight: 600; padding: 12px 22px; border-radius: 14px; background: rgba(255, 153, 0, 0.12); border: 1px solid rgba(255, 153, 0, 0.45); }
+  .end { margin-top: auto; display: flex; align-items: flex-end; justify-content: space-between; animation: rise 0.9s 0.7s both; }
+  .end h1 { font-size: 72px; font-weight: 800; letter-spacing: -0.03em; }
+  .end .tag { font-size: 30px; color: rgba(255, 255, 255, 0.8); margin-top: 8px; }
+  .end .link { text-align: right; font-size: 26px; color: rgba(255, 255, 255, 0.85); line-height: 1.6; }
+  .end .link b { color: #5eead4; }
+  @keyframes rise { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+  <h2>How it works</h2>
+  <div class="arch">
+    <div class="box"><h3>Browser</h3><p>Voice in and out, live cards, MCP Apps host, and every agent step shown as it happens.</p></div>
+    <div class="arrow">⇄</div>
+    <div class="box agent"><h3>Agent backend</h3><p>Amazon Bedrock Converse loop with Nova 2 Lite. Speaks first on alerts. Consent gate: no order without an explicit yes.</p></div>
+    <div class="arrow">⇄</div>
+    <div class="box mcp"><h3>Self-hosted MCP server</h3><p>Spec 2025-11-25 over Streamable HTTP. 17 tools, MCP Apps views, a proactive checker and SQLite household state.</p></div>
+  </div>
+  <div class="aws"><span>Amazon Bedrock</span><span>Bedrock AgentCore Memory</span><span>Agent Skills</span><span>Real Amazon product links</span></div>
+  <div class="end">
+    <div><h1>Unrush</h1><div class="tag">It speaks first, so your evening doesn't fall apart.</div></div>
+    <div class="link"><b>github.com/codergirl73/unrush</b><br />MIT licensed · calendar, travel and checkout simulated</div>
+  </div>
+</body>
+</html>

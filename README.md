@@ -8,7 +8,9 @@ Built for **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track + AWS
 
 ![Unrush demo: the 5:30 meeting runs late, Unrush speaks first with a leave-by time and a 15-minute dinner swap, picks the usual groceries, asks which pesto, and places a simulated order only after an explicit yes, with a link to each product on Amazon.](docs/media/unrush-demo.gif)
 
-*Recorded locally on real Amazon Bedrock (Nova 2 Lite) with AgentCore Memory, using the guided demo: make the meeting run late → Unrush speaks first → say yes → pick a pesto → "Yes, place the order." To try it yourself, see [Setup](#setup) and [Run](#run).*
+▶️ **[Watch the 3-minute demo with narration and sound](docs/media/unrush-demo.mp4)** (MP4, 1080p). The script is in [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
+
+*Both were recorded locally on real Amazon Bedrock (Nova 2 Lite) with AgentCore Memory, using the guided demo: make the meeting run late → Unrush speaks first → say yes → pick a pesto → "Yes, place the order." To try it yourself, see [Setup](#setup) and [Run](#run).*
 
 - **Self-hosted MCP server:** spec **2025-11-25** over **Streamable HTTP**, built with the official TypeScript SDK `@modelcontextprotocol/sdk` **1.32.1**.
 - **MCP Apps:** the server ships interactive `ui://` views (evening timeline, grocery order) via the official `@modelcontextprotocol/ext-apps`.
