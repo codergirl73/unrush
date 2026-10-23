@@ -6,10 +6,10 @@ NAME="${UNRUSH_DEPLOY_NAME:-unrush-demo}"
 export AWS_REGION="${AWS_REGION:-$(grep -E '^AWS_REGION=' .env | cut -d= -f2-)}" AWS_PAGER=""
 ROLE="$NAME-ec2"
 
-INSTANCE=$(aws ec2 describe-instances --filters Name=tag:Name,Values="$NAME" Name=instance-state-name,Values=pending,running,stopping,stopped --query 'Reservations[0].Instances[0].InstanceId' --output text)
+INSTANCE=$(aws ec2 describe-instances --filters Name=tag:Name,Values="$NAME" Name=instance-state-name,Values=pending,running,shutting-down,stopping,stopped --query 'Reservations[0].Instances[0].InstanceId' --output text)
 if [ "$INSTANCE" != "None" ]; then
   aws ec2 terminate-instances --instance-ids "$INSTANCE" >/dev/null
-  echo "Terminating $INSTANCE…"
+  echo "Terminating ${INSTANCE}…"
   aws ec2 wait instance-terminated --instance-ids "$INSTANCE"
 fi
 ALLOC=$(aws ec2 describe-addresses --filters Name=tag:Name,Values="$NAME" --query 'Addresses[0].AllocationId' --output text)
