@@ -46,7 +46,7 @@ run([
 const inputs = tl.audio.flatMap((a) => ["-i", a.file]);
 const delays = tl.audio.map((a, i) => `[${i}:a]aresample=48000,adelay=${Math.round((map(a.t) ?? 0) * 1000)}:all=1[a${i}]`);
 const mix = `${tl.audio.map((_, i) => `[a${i}]`).join("")}amix=inputs=${tl.audio.length}:normalize=0:dropout_transition=0,apad,atrim=0:${total.toFixed(2)},afade=t=out:st=${fadeOut}:d=1.0,loudnorm=I=-16:TP=-1.5:LRA=11[aout]`;
-run([...inputs, "-filter_complex", [...delays, mix].join(";"), "-map", "[aout]", "-c:a", "aac", "-b:a", "192k", join(OUT, "audio.m4a")]);
+run([...inputs, "-filter_complex", [...delays, mix].join(";"), "-map", "[aout]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", join(OUT, "audio.m4a")]);
 
 run(["-i", join(OUT, "video.mp4"), "-i", join(OUT, "audio.m4a"), "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart", "-shortest", join(OUT, "unrush-demo.mp4")]);
 console.log(`unrush-demo.mp4: ${total.toFixed(1)}s, ${frames.length} frames, ${tl.audio.length} voice clips, ${cuts.length} waits cut (${cuts.reduce((s, [a, b]) => s + b - a, 0).toFixed(1)}s removed)`);
