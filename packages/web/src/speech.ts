@@ -109,6 +109,8 @@ export function useSpeaker() {
   const [blocked, setBlocked] = useState(false);
   const lastText = useRef("");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const watchdog = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const started = useRef(false);
 
   const speak = useCallback(
     (text: string) => {
@@ -116,7 +118,10 @@ export function useSpeaker() {
       const synth = window.speechSynthesis;
       lastText.current = text;
       clearTimeout(timer.current);
+      clearTimeout(watchdog.current);
+      started.current = false;
       synth.cancel();
+      synth.resume(); // Chrome can be left paused or wedged by an earlier utterance
       // Short chunks: Chrome silently stops long utterances (notably the network voices) after ~15 s.
       const chunks: string[] = [];
       for (const sentence of text.match(/[^.!?]+[.!?]*\s*/g) ?? [text]) {
@@ -125,13 +130,15 @@ export function useSpeaker() {
         else chunks.push(sentence);
       }
       // Chrome drops an utterance started in the same tick as cancel(), so wait a moment.
-      timer.current = setTimeout(() => {
+      const play = (retry: boolean) => {
         chunks.forEach((chunk, i) => {
           const u = new SpeechSynthesisUtterance(chunk.trim());
-          if (voice.current) u.voice = voice.current;
+          if (voice.current && retry) u.voice = voice.current; // the retry uses the browser's default voice
           u.rate = 1.05;
           if (i === 0)
             u.onstart = () => {
+              started.current = true;
+              clearTimeout(watchdog.current);
               setBlocked(false);
               setSpeaking(true);
             };
@@ -143,7 +150,17 @@ export function useSpeaker() {
           };
           synth.speak(u);
         });
-      }, 80);
+        // The engine sometimes accepts an utterance and never starts it (speaking and pending both stay true).
+        // If nothing has started after a moment, reset it and try once more, then tell the user.
+        watchdog.current = setTimeout(() => {
+          if (started.current) return;
+          synth.cancel();
+          synth.resume();
+          if (retry) setTimeout(() => play(false), 150);
+          else setBlocked(true);
+        }, 1800);
+      };
+      timer.current = setTimeout(() => play(true), 80);
     },
     [muted],
   );
