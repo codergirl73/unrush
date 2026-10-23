@@ -330,3 +330,6 @@ code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, 
 
 .voice-blocked { margin-top: 4px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--warn); background: var(--warn-soft); color: var(--warn); font-size: 12px; font-weight: 650; text-align: left; line-height: 1.3; }
 .voice-blocked:hover { background: var(--warn); color: white; }
+.hear-it { display: inline-flex; align-items: center; gap: 5px; margin: 8px 0 0; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--line-2); background: var(--panel); color: var(--text-2); font-size: 11.5px; font-weight: 600; }
+.hear-it:hover { border-color: var(--brand); color: var(--brand); }
+.bubble.assistant .hear-it { display: flex; }

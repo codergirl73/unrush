@@ -17,6 +17,8 @@ interface Props {
   /** The browser refused to play Unrush's voice. */
   voiceBlocked?: boolean;
   onReplay?: () => void;
+  /** Read a message aloud (a click is the user gesture browsers need before they allow speech). */
+  onSpeak?: (text: string) => void;
   onToggleMute: () => void;
   onSend: (text: string) => void;
   onNewSession: () => void;
@@ -26,7 +28,7 @@ interface Props {
   intro?: string;
 }
 
-export function VoicePanel({ messages, busy, speaking, muted, voiceBlocked, onReplay, onToggleMute, onSend, onNewSession, suggestions, intro }: Props) {
+export function VoicePanel({ messages, busy, speaking, muted, voiceBlocked, onReplay, onSpeak, onToggleMute, onSend, onNewSession, suggestions, intro }: Props) {
   const [text, setText] = useState("");
   const ptt = usePushToTalk((t) => !busy && onSend(t));
   const scroller = useRef<HTMLDivElement>(null);
@@ -101,10 +103,16 @@ export function VoicePanel({ messages, busy, speaking, muted, voiceBlocked, onRe
       </div>
 
       <div className="transcript" ref={scroller}>
-        {messages.length === 0 && !ptt.interim && intro && <div className="bubble assistant intro">{intro}</div>}
+        {messages.length === 0 && !ptt.interim && intro && (
+          <div className="bubble assistant intro">
+            {intro}
+            {onSpeak && !muted && <HearIt onClick={() => onSpeak(intro)} />}
+          </div>
+        )}
         {messages.map((m, i) => (
           <div key={i} className={`bubble ${m.role}`}>
             {m.text}
+            {m.role === "assistant" && onSpeak && !muted && <HearIt onClick={() => onSpeak(m.text)} />}
           </div>
         ))}
         {ptt.interim && <div className="bubble user interim">{ptt.interim}</div>}
@@ -147,5 +155,13 @@ export function VoicePanel({ messages, busy, speaking, muted, voiceBlocked, onRe
         </button>
       </div>
     </section>
+  );
+}
+
+function HearIt({ onClick }: { onClick: () => void }) {
+  return (
+    <button className="hear-it" onClick={onClick} aria-label="Hear this message" title="Hear this message">
+      <SpeakerIcon width={14} height={14} /> Hear it
+    </button>
   );
 }
