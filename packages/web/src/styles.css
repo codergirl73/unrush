@@ -327,3 +327,6 @@ code, pre { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, 
 .cart-links { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
 .cart-link { display: block; padding: 7px 12px; border-radius: 10px; border: 1px solid var(--brand); color: var(--brand); background: var(--panel); font-weight: 600; font-size: 12.5px; text-decoration: none; }
 .cart-link:hover { background: var(--brand); color: white; }
+
+.voice-blocked { margin-top: 4px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--warn); background: var(--warn-soft); color: var(--warn); font-size: 12px; font-weight: 650; text-align: left; line-height: 1.3; }
+.voice-blocked:hover { background: var(--warn); color: white; }

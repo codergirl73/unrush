@@ -326,6 +326,8 @@ export function App() {
           busy={busy}
           speaking={speaker.speaking}
           muted={speaker.muted}
+          voiceBlocked={speaker.blocked}
+          onReplay={speaker.replay}
           onToggleMute={speaker.toggleMute}
           onSend={send}
           onNewSession={newSession}

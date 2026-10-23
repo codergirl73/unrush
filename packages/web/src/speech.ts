@@ -106,19 +106,53 @@ export function useSpeaker() {
     return () => window.speechSynthesis.removeEventListener("voiceschanged", pick);
   }, []);
 
+  const [blocked, setBlocked] = useState(false);
+  const lastText = useRef("");
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
   const speak = useCallback(
     (text: string) => {
       if (muted || !("speechSynthesis" in window)) return;
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(text);
-      if (voice.current) u.voice = voice.current;
-      u.rate = 1.05;
-      u.onstart = () => setSpeaking(true);
-      u.onend = u.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(u);
+      const synth = window.speechSynthesis;
+      lastText.current = text;
+      clearTimeout(timer.current);
+      synth.cancel();
+      // Short chunks: Chrome silently stops long utterances (notably the network voices) after ~15 s.
+      const chunks: string[] = [];
+      for (const sentence of text.match(/[^.!?]+[.!?]*\s*/g) ?? [text]) {
+        const last = chunks.length - 1;
+        if (last >= 0 && chunks[last]!.length + sentence.length < 140) chunks[last] += sentence;
+        else chunks.push(sentence);
+      }
+      // Chrome drops an utterance started in the same tick as cancel(), so wait a moment.
+      timer.current = setTimeout(() => {
+        chunks.forEach((chunk, i) => {
+          const u = new SpeechSynthesisUtterance(chunk.trim());
+          if (voice.current) u.voice = voice.current;
+          u.rate = 1.05;
+          if (i === 0)
+            u.onstart = () => {
+              setBlocked(false);
+              setSpeaking(true);
+            };
+          u.onend = () => i === chunks.length - 1 && setSpeaking(false);
+          u.onerror = (e) => {
+            setSpeaking(false);
+            // "canceled"/"interrupted" just mean something newer started; anything else is a real failure.
+            if (e.error !== "canceled" && e.error !== "interrupted") setBlocked(true);
+          };
+          synth.speak(u);
+        });
+      }, 80);
     },
     [muted],
   );
+
+  /** Say the last reply again (also the way past a browser that blocks speech before a click). */
+  const replay = useCallback(() => {
+    setBlocked(false);
+    if (lastText.current) speak(lastText.current);
+  }, [speak]);
 
   const toggleMute = useCallback(() => {
     setMuted((m) => {
@@ -133,5 +167,5 @@ export function useSpeaker() {
     });
   }, []);
 
-  return { muted, speaking, speak, toggleMute };
+  return { muted, speaking, speak, toggleMute, blocked, replay };
 }

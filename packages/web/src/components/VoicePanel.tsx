@@ -14,6 +14,9 @@ interface Props {
   busy: boolean;
   speaking: boolean;
   muted: boolean;
+  /** The browser refused to play Unrush's voice. */
+  voiceBlocked?: boolean;
+  onReplay?: () => void;
   onToggleMute: () => void;
   onSend: (text: string) => void;
   onNewSession: () => void;
@@ -23,7 +26,7 @@ interface Props {
   intro?: string;
 }
 
-export function VoicePanel({ messages, busy, speaking, muted, onToggleMute, onSend, onNewSession, suggestions, intro }: Props) {
+export function VoicePanel({ messages, busy, speaking, muted, voiceBlocked, onReplay, onToggleMute, onSend, onNewSession, suggestions, intro }: Props) {
   const [text, setText] = useState("");
   const ptt = usePushToTalk((t) => !busy && onSend(t));
   const scroller = useRef<HTMLDivElement>(null);
@@ -89,6 +92,11 @@ export function VoicePanel({ messages, busy, speaking, muted, onToggleMute, onSe
           <div className="orb-label">{label}</div>
           {ptt.supported && state === "idle" && <div className="orb-hint">Press and hold the mic, or hold Space</div>}
           {ptt.error && <div className="mic-error">{ptt.error}</div>}
+          {voiceBlocked && !muted && (
+            <button className="voice-blocked" onClick={onReplay}>
+              🔇 Your browser blocked the voice. Click to hear it.
+            </button>
+          )}
         </div>
       </div>
 
